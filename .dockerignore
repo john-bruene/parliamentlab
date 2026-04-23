@@ -1,0 +1,26 @@
+# Git & editor state
+.git
+.gitignore
+.github
+
+# RStudio / R session state
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+.positai
+
+# Publish / deployment metadata
+rsconnect
+fly.toml
+
+# Development-only scripts and notebooks not used by the running app
+archive
+
+# Raw CSV sources — the app now reads the compact .rds versions
+data/*.csv
+
+# Docker build artefacts
+Dockerfile.dockerignore
+.dockerignore
