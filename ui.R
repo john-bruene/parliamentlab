@@ -5,6 +5,7 @@ library(plotly)
 library(shinyBS)
 library(shinyjs)
 library(reactable)
+library(bslib)  # needed for input_switch() on line ~633
 
 
 # Define EPG colors
