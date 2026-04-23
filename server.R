@@ -37,23 +37,18 @@ library(NbClust)
 library(gridExtra)     
 
 
-P6 <- read.csv("data/P6_umap_scores_red_NEW.csv")[, -(1:3)]
-P7 <- read.csv("data/P7_umap_scores_red_NEW.csv")[, -(1:3)]
-P8 <- read.csv("data/P8_umap_scores_red_NEW.csv")[, -(1:3)]
-P9 <- read.csv("data/P9_umap_scores_red_NEW.csv")[, -(1:3)]
+# UMAP score tables and the voted-docs index are preprocessed into compact,
+# gzip-compressed .rds files by scripts/convert_data_to_rds.R. The index
+# columns (`Unnamed: 0`, `X.1`, `X`) have already been dropped and the
+# coord1D / coord2D_red sign flips for P7-P9 are baked in; see the
+# conversion script for details. Regenerate the .rds files whenever the
+# source CSV / XLSX change.
+P6 <- readRDS("data/P6_umap.rds")
+P7 <- readRDS("data/P7_umap.rds")
+P8 <- readRDS("data/P8_umap.rds")
+P9 <- readRDS("data/P9_umap.rds")
 
-
-#change the sign of the first dimension (to fit left-right scaling)
-
-P7$coord1D <- P7$coord1D*-1
-P8$coord1D <- P8$coord1D*-1
-P9$coord1D <- P9$coord1D*-1
-
-P7$coord2D_red <- P7$coord2D_red*-1
-P8$coord2D_red <- P8$coord2D_red*-1
-
-
-EP6_9_Voted <- read_excel("data/EP6_9_Voted_docs_new_datesfixed.xlsx")
+EP6_9_Voted <- readRDS("data/EP6_9_Voted.rds")
 
 
 five_thirty <- read.csv("www/clustered_congress.csv")
