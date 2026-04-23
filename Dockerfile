@@ -12,8 +12,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Installiere die R-Pakete, die in deiner App auf CRAN verfügbar sind
-RUN R -e "install.packages(c('shiny','shinythemes','DT','ggplot2','sortable','plotly','shinyBS','shinyjs','reactable'), repos='http://cran.rstudio.com/')"
+# Installiere die R-Pakete, die in der App via library() geladen werden.
+# Ncpus=4 beschleunigt die Source-Kompilation (sf, FactoMineR, umap ...).
+# Die abschließende setdiff-Prüfung macht Build laut fehlschlagen, falls ein
+# Paket nicht installiert werden konnte (install.packages warnt normalerweise
+# nur, wodurch das Image heimlich mit fehlenden Deps durchgeht).
+RUN R -e "options(Ncpus = 4); \
+  pkgs <- c('shiny','shinythemes','DT','ggplot2','dplyr','tidyr','scales','gridExtra', \
+            'sortable','plotly','shinyBS','shinyjs','reactable', \
+            'clusterCrit','umap','dbscan','FactoMineR','factoextra', \
+            'packcircles','viridis','ggiraph','sf','sparkline','waffle'); \
+  install.packages(pkgs, repos = 'http://cran.rstudio.com/'); \
+  missing <- setdiff(pkgs, rownames(installed.packages())); \
+  if (length(missing) > 0) stop('install.packages failed for: ', paste(missing, collapse = ', '))"
 
 # Installiere ggparliament von GitHub
 RUN R -e 'if (!requireNamespace("remotes", quietly=TRUE)) install.packages("remotes", repos="http://cran.rstudio.com/"); remotes::install_github("zmeers/ggparliament")'
