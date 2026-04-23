@@ -27,7 +27,7 @@ RUN R -e "options(Ncpus = 4); \
   pkgs <- c('shiny','shinythemes','DT','ggplot2','dplyr','tidyr','scales','gridExtra', \
             'sortable','plotly','shinyBS','shinyjs','reactable', \
             'clusterCrit','umap','dbscan','FactoMineR','factoextra', \
-            'packcircles','viridis','ggiraph','sf','sparkline'); \
+            'packcircles','viridis','ggiraph','sf','sparkline','bslib'); \
   install.packages(pkgs, repos = 'http://cran.rstudio.com/'); \
   missing <- setdiff(pkgs, rownames(installed.packages())); \
   if (length(missing) > 0) stop('install.packages failed for: ', paste(missing, collapse = ', '))"
