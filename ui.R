@@ -1,20 +1,10 @@
 library(shiny)
 library(shinythemes)
 library(DT)
-library(ggplot2)
-library(car)
-library(nortest)
-library(tseries)
-library(RcmdrMisc)
-library(lmtest)
-library(sortable)
 library(plotly)
 library(shinyBS)
-library(shinyjs) 
-library(fontawesome)
+library(shinyjs)
 library(reactable)
-library(bslib)
-library(shinyWidgets)
 
 
 # Define EPG colors
