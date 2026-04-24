@@ -4,7 +4,7 @@ FROM rocker/shiny:latest
 # Installiere benötigte System-Bibliotheken.
 # - libudunits2/gdal/geos/proj:  sf
 # - libssl/libcurl/libxml2:      httr, curl, xml2
-# - cmake + libabsl-dev:         nloptr -> lme4 -> car -> FactoMineR/factoextra,
+# - cmake + libabsl-dev:         nloptr -> lme4 -> car -> FactoMineR,
 #                                und s2 -> sf
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libudunits2-dev \
@@ -26,15 +26,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN R -e "options(Ncpus = 4); \
   pkgs <- c('shiny','shinythemes','DT','ggplot2','dplyr','tidyr','scales','gridExtra', \
             'sortable','plotly','shinyBS','shinyjs','reactable', \
-            'clusterCrit','umap','dbscan','FactoMineR','factoextra', \
-            'packcircles','viridis','ggiraph','sf','sparkline','bslib'); \
+            'clusterCrit','umap','dbscan','FactoMineR', \
+            'packcircles','ggiraph','sf','sparkline','bslib'); \
   install.packages(pkgs, repos = 'http://cran.rstudio.com/'); \
   missing <- setdiff(pkgs, rownames(installed.packages())); \
   if (length(missing) > 0) stop('install.packages failed for: ', paste(missing, collapse = ', '))"
 
-# ggparliament removed: parliament layout is now implemented locally in
-# R/parliament_local.R — no GitHub dependency required.
-# waffle is still loaded via library(waffle) from CRAN (already in the layer above).
+# ggparliament + waffle removed: parliament layout and waffle charts are now
+# implemented locally in R/parliament_local.R — no GitHub dependency required.
 
 # Kopiere alle Dateien (inklusive ui.R, server.R, Daten, www, etc.) in den Shiny-Server-Ordner
 COPY . /srv/shiny-server/
