@@ -21,6 +21,7 @@ library(htmltools)
 library(waffle)
 library(scales)
 library(gridExtra)
+library(ggparliament)  # parliament_data(), geom_parliament_seats(), theme_ggparliament()
 
 
 # UMAP score tables and the voted-docs index are preprocessed into compact,
