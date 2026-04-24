@@ -1088,6 +1088,7 @@ shinyServer(function(input, output, session) {
     settings <- get_party_settings()
     axis_labels <- settings$axis_labels  # Kurzbezeichnungen der Parteien für den Boxplot
     
+    req(data)
     # Datenaufbereitung mit Kurzbezeichnungen für die Tabelle
     summary_data <- data %>%
       filter(!is.na(EPG)) %>%
@@ -1147,6 +1148,7 @@ shinyServer(function(input, output, session) {
     
     # Use transformed data instead of data_react()
     data <- datasets$transformedData
+    req(data)
     settings <- get_party_settings()
     
     # Retrieve color palette and axis labels for each EPG from the settings
@@ -1183,7 +1185,8 @@ shinyServer(function(input, output, session) {
   # Plot rendern und Daten verarbeiten
   output$countryMapPlot <- renderPlot({
     req(input$selectedVariable2)  # Sicherstellen, dass eine Variable ausgewählt ist
-    
+    req(datasets$transformedData)
+
     # Laden der Eurostat-Geodaten und Vorbereitung
     SHP_0 <- readRDS("data/SHP_0.rds")
     
@@ -1249,7 +1252,8 @@ shinyServer(function(input, output, session) {
   # Tabelle der Top 3 und Last 3 Länder
   output$tabletop <- renderReactable({
     req(input$selectedVariable2)
-    
+    req(datasets$transformedData)
+
     # Aggregieren der Daten und Hinzufügen von Platzierungen
     aggregated_data <- datasets$transformedData %>%
       group_by(Country) %>%
@@ -2834,7 +2838,8 @@ shinyServer(function(input, output, session) {
   # Reactive expression for filtered data
   filteredData <- reactive({
     data <- datasets$transformedData
-    
+    req(data)  # Guard: filters need data; also protects against NULL input$country etc.
+
     # Initialize an unnamed list to hold filter expressions
     filter_exprs <- list()
     
@@ -2937,6 +2942,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$filterSummary <- renderPrint({
+    req(datasets$transformedData)
     total_rows <- nrow(datasets$transformedData)
     filtered_rows <- nrow(filteredData())
     na_counts <- sapply(datasets$transformedData[, c("Age", "Activity_Index", "Gender", "Country")], function(x) sum(is.na(x)))
@@ -3015,6 +3021,7 @@ shinyServer(function(input, output, session) {
     click_data <- event_data("plotly_click", source = "parliamentPlot")
     
     data <- datasets$transformedData  # Use the selected dataset
+    req(data)
     data$Name <- data$full
     
     if (!is.null(click_data)) {
