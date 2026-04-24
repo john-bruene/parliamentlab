@@ -9,15 +9,12 @@ library(plotly)
 library(umap)
 library(dbscan)
 library(FactoMineR)
-library(factoextra)
 library(packcircles)
-library(viridis)
 library(ggiraph)
 library(sf)
 library(reactable)
 library(tidyr)
 library(sparkline)
-library(htmltools)
 library(scales)
 library(gridExtra)
 
@@ -1243,7 +1240,7 @@ shinyServer(function(input, output, session) {
     # ggplot Karte erstellen
     ggplot(map_data) +
       geom_sf(aes(fill = mean_value), color = "white", size = 0.2) +
-      scale_fill_viridis(
+      scale_fill_viridis_c(
         name = input$selectedVariable2,
         option = "magma",
         direction = -1,
@@ -2366,16 +2363,7 @@ shinyServer(function(input, output, session) {
       if (input$enable_silhouette) {
         output$silhouettePlot <- renderPlot({
           avg_silhouette_score <- mean(silhouette_score()[, 'sil_width'])
-          fviz_silhouette(silhouette_score()) +
-            ggtitle("Silhouette Plot") +
-            geom_hline(yintercept = 0.5, linetype = "dashed", color = "darkblue", size = 0.75) +
-            annotate("text", x = 1, y = 0.55, label = "Good Separation Threshold", 
-                     color = "darkblue", size = 4, hjust = 0, vjust = -0.5) +
-            theme_minimal() +
-            theme(plot.title = element_text(size = 16, face = "bold"), 
-                  plot.caption = element_text(color = "red", face = "bold", size = 12),
-                  legend.position = "right") +
-            labs(caption = paste("Average Silhouette Score:", round(avg_silhouette_score, 3)))
+          silhouette_gg(silhouette_score(), avg_silhouette_score)
         })
       }
       
@@ -2857,7 +2845,11 @@ shinyServer(function(input, output, session) {
   # Reactive expression for filtered data
   filteredData <- reactive({
     data <- datasets$transformedData
-    req(data)  # Guard: filters need data; also protects against NULL input$country etc.
+    req(data)  # Guard: wait for data pipeline to complete
+
+    # Dynamic filter inputs are rendered AFTER data is loaded.
+    # req() here ensures filteredData waits until all four sliders/selects exist.
+    req(input$ageRange, input$activityRange, input$gender, input$country)
 
     # Initialize an unnamed list to hold filter expressions
     filter_exprs <- list()
@@ -3362,6 +3354,33 @@ shinyServer(function(input, output, session) {
     selected_epg(NULL)  # Reset the selected EPG
   })
   
+  # ── Geometry cache for cluster bubble plots ──────────────────────────────────
+  # circleProgressiveLayout + circleLayoutVertices are expensive (they're the
+  # girafe bottleneck).  They only depend on cluster membership, NOT on the
+  # highlight / EPG color inputs.  Cache them once per clustering run so that
+  # every highlight or color change skips the geometry recomputation entirely.
+  clusterGeomCache <- reactiveVal(list())
+
+  observeEvent(get_selected_data(), {
+    data <- get_selected_data()
+    if (is.null(data) || !"Cluster" %in% colnames(data)) {
+      clusterGeomCache(list())
+      return()
+    }
+    data <- data[data$Cluster != 0, ]
+    unique_clusters <- sort(unique(data$Cluster))
+
+    cache <- lapply(unique_clusters, function(cid) {
+      cd      <- subset(data, Cluster == cid)
+      packing <- circleProgressiveLayout(rep(1, nrow(cd)), sizetype = "area")
+      # npoints = 20 (was 50): visually indistinguishable at 300 px, ~2.5x less SVG
+      dat_gg  <- circleLayoutVertices(packing, npoints = 20)
+      list(base = cd, packing = packing, dat_gg = dat_gg)
+    })
+    names(cache) <- as.character(unique_clusters)
+    clusterGeomCache(cache)
+  }, ignoreNULL = TRUE)
+
   # Plot generation with conditional highlighting based on selected politician or EPG
   output$clusterPlots <- renderUI({
     data <- get_selected_data()
@@ -3400,91 +3419,96 @@ shinyServer(function(input, output, session) {
   })
   
   # Observing input to dynamically generate cluster plots with highlighting
+  # Geometry (circleProgressiveLayout / circleLayoutVertices) is read from
+  # clusterGeomCache — only colours + alphas are recomputed here.
   observe({
     data <- get_selected_data()
     req(data)
-    
-    # Check for 'Cluster' column and load party colors
-    if (!"Cluster" %in% colnames(data)) {
-      return(NULL)
-    }
-    settings <- get_party_settings()
-    party_colors <- settings$party_colors
-    
+    if (!"Cluster" %in% colnames(data)) return(NULL)
+
+    geom_cache <- clusterGeomCache()
+    if (length(geom_cache) == 0) return(NULL)
+
+    settings          <- get_party_settings()
+    party_colors      <- settings$party_colors
     selected_politician <- input$searchPolitician
-    selected_epg_group <- selected_epg()
-    color_by_epg <- input$color_epg
-    
+    selected_epg_group  <- selected_epg()
+    color_by_epg        <- input$color_epg
+
     data <- data[data$Cluster != 0, ]
-    
-    # Generate each plot based on each cluster
     unique_clusters <- sort(unique(data$Cluster))
+
     for (cluster_id in unique_clusters) {
       local({
-        cluster_data <- subset(data, Cluster == cluster_id)
-        cluster_name <- as.character(cluster_id)
-        
-        # Default color for all observations
-        default_color <- "lightgrey"
-        cluster_data$highlight_color <- default_color
-        
-        # Update the highlight column based on the selected politician or selected EPG
-        cluster_data$highlight <- "Normal"  # Default state
-        
-        # Highlight individual politician if selected
-        if (!is.null(selected_politician) && selected_politician != "") {
-          cluster_data$highlight <- ifelse(cluster_data$Name == selected_politician, "Highlight", "Normal")
-          cluster_data$highlight_color <- ifelse(cluster_data$Name == selected_politician, party_colors[cluster_data$EPG], default_color)
+        cname  <- as.character(cluster_id)
+        cached <- geom_cache[[cname]]
+        if (is.null(cached)) return()
+
+        cluster_data <- cached$base
+        dat_gg       <- cached$dat_gg   # pre-computed polygon vertices
+
+        # ── Colouring (cheap) ────────────────────────────────────────────────
+        default_color          <- "lightgrey"
+        cluster_data$highlight <- "Normal"
+
+        # Base colour: party colour (color_epg ON) or grey (color_epg OFF)
+        cluster_data$highlight_color <- if (isTruthy(color_by_epg)) {
+          party_colors[cluster_data$EPG]
+        } else {
+          rep(default_color, nrow(cluster_data))
         }
-        
-        # Highlight EPG group if selected
+
+        # EPG highlight: selected group → party colour + full alpha;
+        # all others → grey + dimmed alpha  (works regardless of color_epg)
         if (!is.null(selected_epg_group) && selected_epg_group != "") {
-          cluster_data$highlight <- ifelse(cluster_data$EPG == selected_epg_group, "Highlight", cluster_data$highlight)
-          
-          # Set color only for selected EPG group if the "Color by EPG" option is off
-          if (!isTruthy(color_by_epg)) {
-            cluster_data$highlight_color <- ifelse(cluster_data$EPG == selected_epg_group, party_colors[cluster_data$EPG], default_color)
-          }
-        } else if (isTruthy(color_by_epg)) {
-          # Apply EPG colors to all if "Color by EPG" is active
-          cluster_data$highlight_color <- party_colors[cluster_data$EPG]
+          is_epg <- cluster_data$EPG == selected_epg_group
+          cluster_data$highlight[is_epg]          <- "Highlight"
+          cluster_data$highlight_color[is_epg]    <- party_colors[cluster_data$EPG[is_epg]]
+          cluster_data$highlight_color[!is_epg]   <- default_color
         }
-        
-        output[[paste0("clusterPlot_", cluster_name)]] <- renderGirafe({
-          # Tooltips for MEPs
-          cluster_data$text <- paste("MEP:", cluster_data$Name, "<br>EPG:", cluster_data$EPG, "<br>Cluster:", cluster_data$Cluster)
-          
-          # Generate circle layout with dynamic sizes
-          packing <- circleProgressiveLayout(
-            ifelse(cluster_data$highlight == "Highlight", 2, 1),  # Larger circles for highlights
-            sizetype = 'area'
-          )
-          cluster_data <- cbind(cluster_data, packing)
-          dat.gg <- circleLayoutVertices(packing, npoints = 50)
-          
-          # Align indices properly for `dat.gg` and `cluster_data`
-          dat.gg$highlight_color <- cluster_data$highlight_color[dat.gg$id]
-          dat.gg$alpha <- ifelse(cluster_data$highlight[dat.gg$id] == "Highlight", 1, 0.8)
-          
-          # Plot with conditional highlighting
-          p <- ggplot() + 
+
+        # Politician highlight overrides EPG highlight (most specific wins)
+        if (!is.null(selected_politician) && selected_politician != "") {
+          is_match <- cluster_data$Name == selected_politician
+          cluster_data$highlight[is_match]       <- "Highlight"
+          cluster_data$highlight_color[is_match] <- party_colors[cluster_data$EPG[is_match]]
+        }
+
+        cluster_data$text <- paste0(
+          "MEP: ", cluster_data$Name,
+          "<br>EPG: ", cluster_data$EPG,
+          "<br>Cluster: ", cluster_data$Cluster
+        )
+
+        # Attach colours to the cached polygon frame
+        dat_gg$highlight_color <- cluster_data$highlight_color[dat_gg$id]
+        # Dim non-highlighted circles only when something is actively selected.
+        # Without a selection everything is fully opaque.
+        anything_selected <- (!is.null(selected_epg_group) && selected_epg_group != "") ||
+                             (!is.null(selected_politician) && selected_politician != "")
+        dim_alpha <- if (anything_selected) 0.35 else 1
+        dat_gg$alpha <- ifelse(cluster_data$highlight[dat_gg$id] == "Highlight", 1, dim_alpha)
+
+        output[[paste0("clusterPlot_", cname)]] <- renderGirafe({
+          p <- ggplot() +
             geom_polygon_interactive(
-              data = dat.gg, 
-              aes(x, y, group = id, fill = highlight_color, tooltip = cluster_data$text[id], 
-                  data_id = id, alpha = alpha), 
-              colour = ifelse(dat.gg$alpha == 1, "black", "black")  # Dynamic border colors
+              data = dat_gg,
+              aes(x, y,
+                  group   = id,
+                  fill    = highlight_color,
+                  tooltip = cluster_data$text[id],
+                  data_id = id,
+                  alpha   = alpha),
+              colour = "black"
             ) +
-            scale_fill_identity() +  # Use fill colors directly from the `highlight_color` column
-            scale_alpha_identity() +  # Ensures alpha is handled as specified
+            scale_fill_identity() +
+            scale_alpha_identity() +
             theme_void() +
             coord_equal() +
-            labs(title = paste("Cluster", cluster_name)) +
-            theme(
-              plot.margin = unit(c(0, 0, 0, 0), "cm"),
-              legend.position = "none"
-            )
-          
-          # Render interactive plot
+            labs(title = paste("Cluster", cname)) +
+            theme(plot.margin = unit(c(0, 0, 0, 0), "cm"),
+                  legend.position = "none")
+
           girafe(ggobj = p, width_svg = 5, height_svg = 5)
         })
       })
@@ -3655,8 +3679,9 @@ shinyServer(function(input, output, session) {
         legend_labels <- paste0(epg_distribution$EPG_Full, " (", round(epg_distribution$Percentage, 1), "%)")
         names(epg_counts) <- legend_labels
         
-        # Define the colors for the EPGs
-        epg_colors_full <- epg_colors[epg_distribution$EPG]
+        # Look up colors directly from party_colors by EPG key —
+        # avoids the positional name-swap on the local `epg_colors` variable
+        epg_colors_full <- settings$party_colors[epg_distribution$EPG]
         names(epg_colors_full) <- legend_labels
         
         # Render the waffle chart

@@ -20,7 +20,9 @@
 #'
 #' @param total_seats  Integer. Total number of seats to place.
 #' @param n_rows       Integer. Number of concentric arcs.
-#' @return data.frame with columns x, y, row  (nrow == total_seats)
+#' @return data.frame with columns x, y, row  (nrow == total_seats),
+#'         sorted by angle descending (π → 0, i.e. left → right visually)
+#'         so that parties are assigned in contiguous left-to-right wedges.
 .semicircle_coords <- function(total_seats, n_rows) {
   # Radii of the arcs: inner arc = 1.5, each subsequent arc +1
   r_min  <- 1.5
@@ -46,13 +48,23 @@
     r   <- radii[i]
     ang <- seq(0, pi, length.out = n + 2L)[-c(1L, n + 2L)]
     coords_list[[i]] <- data.frame(
-      x   = r * cos(ang),
-      y   = r * sin(ang),
-      row = i
+      x     = r * cos(ang),
+      y     = r * sin(ang),
+      row   = i,
+      angle = ang          # kept for sort, removed afterwards
     )
   }
 
-  do.call(rbind, coords_list)
+  all_coords <- do.call(rbind, coords_list)
+
+  # Sort by angle DESCENDING (π = left side first, 0 = right side last).
+  # This fills the semicircle in vertical "columns" left→right so that
+  # parties occupy contiguous wedges rather than contiguous arcs.
+  all_coords <- all_coords[order(all_coords$angle, decreasing = TRUE), ]
+  all_coords$angle <- NULL
+  rownames(all_coords) <- NULL
+
+  all_coords
 }
 
 
@@ -170,4 +182,49 @@ waffle_gg <- function(parts, rows = 10, colors = NULL,
   }
 
   p
+}
+
+
+# ── 6. silhouette_gg() ────────────────────────────────────────────────────────
+
+#' Replaces factoextra::fviz_silhouette()
+#'
+#' Draws a barplot of per-observation silhouette widths, coloured by cluster,
+#' sorted descending within each cluster (same layout as fviz_silhouette).
+#'
+#' @param sil_obj   A `cluster::silhouette()` matrix (columns: cluster,
+#'                  neighbor, sil_width). Coerced to data.frame internally.
+#' @param avg_score Numeric. Pre-computed mean sil_width for the caption.
+#' @return A ggplot object.
+silhouette_gg <- function(sil_obj, avg_score) {
+  df <- as.data.frame(unclass(sil_obj))   # matrix → data.frame
+  df$obs <- seq_len(nrow(df))
+
+  # Sort: by cluster ascending, then sil_width descending within cluster
+  df <- df[order(df$cluster, -df$sil_width), ]
+  df$pos <- seq_len(nrow(df))             # x-position after sort
+
+  ggplot(df, aes(x = .data$pos, y = .data$sil_width,
+                 fill = factor(.data$cluster))) +
+    geom_bar(stat = "identity", width = 1, colour = NA) +
+    geom_hline(yintercept = 0.5, linetype = "dashed",
+               colour = "darkblue", linewidth = 0.75) +
+    annotate("text", x = 1, y = 0.55,
+             label = "Good Separation Threshold",
+             colour = "darkblue", size = 4, hjust = 0, vjust = -0.5) +
+    scale_x_continuous(breaks = NULL) +
+    labs(
+      title   = "Silhouette Plot",
+      x       = NULL,
+      y       = "Silhouette width",
+      fill    = "Cluster",
+      caption = paste("Average Silhouette Score:",
+                      round(avg_score, 3))
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title    = element_text(size = 16, face = "bold"),
+      plot.caption  = element_text(colour = "red", face = "bold", size = 12),
+      legend.position = "right"
+    )
 }
