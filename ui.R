@@ -181,7 +181,7 @@ shinyUI(fluidPage(
              However, this example serves as a reminder of the challenges of clustering unlabelled data: there is no single 'correct' number of clusters. 
              Depending on how we choose to analyze the data, we could find 4, 8, or even 10 clusters, without a definitive answer as to which is most accurate.", 
                                      style = "color:black;text-align:justify"),
-                                   a(href = "https://projects.fivethirtyeight.com/types-democrats-republicans-house-2024/", 
+                                   a(href = "https://web.archive.org/web/20240509010255/https://projects.fivethirtyeight.com/types-democrats-republicans-house-2024/", 
                                      tags$img(src = "538_Overview_1.png", width = "100%", height = "auto", style = "border:1px solid black"),
                                      target = "_blank"),
                                    
