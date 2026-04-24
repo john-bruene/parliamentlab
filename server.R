@@ -2876,7 +2876,8 @@ shinyServer(function(input, output, session) {
   # Initialize default values after data is loaded
   observe({
     data <- datasets$transformedData
-    
+    req(data)  # Guard: don't run until transformation step is complete
+
     # Age Slider
     output$ageSliderUI <- renderUI({
       sliderInput("ageRange", "Age Range:",
