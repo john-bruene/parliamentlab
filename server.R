@@ -18,25 +18,45 @@ library(reactable)
 library(tidyr)
 library(sparkline)
 library(htmltools)
-library(waffle)
 library(scales)
 library(gridExtra)
-library(ggparliament)  # parliament_data(), geom_parliament_seats(), theme_ggparliament()
 
+# Local parliament layout — replaces ggparliament package dependency.
+# Provides: parliament_data_local(), geom_parliament_seats_local(),
+#           theme_ggparliament_local()
+source("R/parliament_local.R")
 
+# ── Optional lightweight profiling ──────────────────────────────────────────
+# Set option(parliamentlab.profile = TRUE) before sourcing (e.g. in profile.R)
+# to emit system.time() lines to the console for every timed block.
+# In production the wrapper is a zero-overhead pass-through.
+.PROFILE <- isTRUE(getOption("parliamentlab.profile"))
+timed <- if (.PROFILE) {
+  function(label, expr) {
+    t <- system.time(result <- force(expr))
+    message(sprintf("[PROFILE] %-45s %.3fs", label, t[["elapsed"]]))
+    result
+  }
+} else {
+  function(label, expr) expr
+}
+
+# ── Data loading ─────────────────────────────────────────────────────────────
 # UMAP score tables and the voted-docs index are preprocessed into compact,
 # gzip-compressed .rds files by scripts/convert_data_to_rds.R. The index
 # columns (`Unnamed: 0`, `X.1`, `X`) have already been dropped and the
 # coord1D / coord2D_red sign flips for P7-P9 are baked in; see the
 # conversion script for details. Regenerate the .rds files whenever the
 # source CSV / XLSX change.
-P6 <- readRDS("data/P6_umap.rds")
-P7 <- readRDS("data/P7_umap.rds")
-P8 <- readRDS("data/P8_umap.rds")
-P9 <- readRDS("data/P9_umap.rds")
+P6 <- timed("readRDS P6_umap", readRDS("data/P6_umap.rds"))
+P7 <- timed("readRDS P7_umap", readRDS("data/P7_umap.rds"))
+P8 <- timed("readRDS P8_umap", readRDS("data/P8_umap.rds"))
+P9 <- timed("readRDS P9_umap", readRDS("data/P9_umap.rds"))
 
-EP6_9_Voted <- readRDS("data/EP6_9_Voted.rds")
+EP6_9_Voted <- timed("readRDS EP6_9_Voted", readRDS("data/EP6_9_Voted.rds"))
 
+# SHP_0 loaded once globally — previously re-read on every countryMapPlot render
+SHP_0 <- timed("readRDS SHP_0", readRDS("data/SHP_0.rds"))
 
 five_thirty <- read.csv("www/clustered_congress.csv")
 
@@ -1187,8 +1207,7 @@ shinyServer(function(input, output, session) {
     req(input$selectedVariable2)  # Sicherstellen, dass eine Variable ausgewählt ist
     req(datasets$transformedData)
 
-    # Laden der Eurostat-Geodaten und Vorbereitung
-    SHP_0 <- readRDS("data/SHP_0.rds")
+    # SHP_0 loaded globally at startup — no readRDS here
     
     # Zuordnungstabelle erstellen, um Ländernamen in geo-Codes umzuwandeln
     country_codes <- tibble(
@@ -2784,12 +2803,12 @@ shinyServer(function(input, output, session) {
              full_label = paste0(seats, " Seats", " (", seat_share_label, ")"))
     
     # Merge parliament data with colors and selection status
-    parliament_data <- parliament_data(
-      election_data = data,  
-      parl_rows = parl_rows_nr,
-      type = 'semicircle',
-      party_seats = data$seats
-    ) %>% 
+    parliament_data <- parliament_data_local(
+      election_data = data,
+      parl_rows     = parl_rows_nr,
+      type          = "semicircle",
+      party_seats   = data$seats
+    ) %>%
       mutate(member_name = data$member_name,
              selected = data$selected) %>%
       left_join(color_df, by = "party_name_short")
@@ -2799,8 +2818,8 @@ shinyServer(function(input, output, session) {
                          aes(x, y, color = party_name_short, 
                              text = paste("Member:", member_name, "<br>Party:", party_name_short), 
                              key = member_name)) +
-      geom_parliament_seats(aes(alpha = selected), show.legend = FALSE) +
-      theme_ggparliament(legend = FALSE) +
+      geom_parliament_seats_local(aes(alpha = selected), show.legend = FALSE) +
+      theme_ggparliament_local(legend = FALSE) +
       theme(legend.position = "bottom") +
       guides(color = guide_legend(nrow = 2), alpha = "none") +
       scale_color_manual("Party", values = setNames(color_df$colour, color_df$party_name_short)) +
@@ -3643,11 +3662,11 @@ shinyServer(function(input, output, session) {
         # Render the waffle chart
         output[[paste0("epgWaffle_", cluster_id)]] <- renderPlot({
           # Create the waffle chart
-          waffle_chart <- waffle(
-            parts = epg_counts,
-            rows = 10,
-            colors = epg_colors_full,
-            title = paste("EPG Composition in Cluster", cluster_id),
+          waffle_chart <- waffle_gg(
+            parts      = epg_counts,
+            rows       = 10,
+            colors     = epg_colors_full,
+            title      = paste("EPG Composition in Cluster", cluster_id),
             legend_pos = "bottom"
           )
           
