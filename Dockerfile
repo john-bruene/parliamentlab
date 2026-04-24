@@ -32,16 +32,9 @@ RUN R -e "options(Ncpus = 4); \
   missing <- setdiff(pkgs, rownames(installed.packages())); \
   if (length(missing) > 0) stop('install.packages failed for: ', paste(missing, collapse = ', '))"
 
-# GitHub-only Pakete:
-# - ggparliament: ist nicht (mehr) auf CRAN
-# - waffle:       CRAN-Version ist veraltet und passt nicht zu dieser R-Version
-RUN R -e "options(Ncpus = 4); \
-  if (!requireNamespace('remotes', quietly = TRUE)) install.packages('remotes', repos = 'http://cran.rstudio.com/'); \
-  remotes::install_github('zmeers/ggparliament', upgrade = 'never'); \
-  remotes::install_github('hrbrmstr/waffle',    upgrade = 'never'); \
-  gh_pkgs <- c('ggparliament','waffle'); \
-  missing <- setdiff(gh_pkgs, rownames(installed.packages())); \
-  if (length(missing) > 0) stop('github install failed for: ', paste(missing, collapse = ', '))"
+# ggparliament removed: parliament layout is now implemented locally in
+# R/parliament_local.R — no GitHub dependency required.
+# waffle is still loaded via library(waffle) from CRAN (already in the layer above).
 
 # Kopiere alle Dateien (inklusive ui.R, server.R, Daten, www, etc.) in den Shiny-Server-Ordner
 COPY . /srv/shiny-server/
