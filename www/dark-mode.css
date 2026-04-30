@@ -1,0 +1,219 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ParliamentLab – Dark Mode
+   Activated by adding class "dark-mode" to <body> via shinyjs.
+   Uses !important throughout to override Shiny/Bootstrap inline styles.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Page background & default text ─────────────────────────────────────── */
+body.dark-mode {
+  background-color: #1a1a2e !important;
+  color: #dde1f0 !important;
+}
+
+/* ── Navbar ──────────────────────────────────────────────────────────────── */
+body.dark-mode .navbar,
+body.dark-mode .navbar-default {
+  background-color: #16213e !important;
+  border-color: #0f3460 !important;
+}
+body.dark-mode .navbar-default .navbar-brand,
+body.dark-mode .navbar-default .navbar-nav > li > a,
+body.dark-mode .navbar-default .navbar-text {
+  color: #c8cee8 !important;
+}
+body.dark-mode .navbar-default .navbar-nav > .active > a,
+body.dark-mode .navbar-default .navbar-nav > .active > a:hover,
+body.dark-mode .navbar-default .navbar-nav > .active > a:focus {
+  background-color: #0f3460 !important;
+  color: #ffffff !important;
+}
+body.dark-mode .navbar-default .navbar-nav > li > a:hover {
+  background-color: #1e3a5e !important;
+  color: #ffffff !important;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+body.dark-mode .nav-tabs { border-color: #0f3460 !important; }
+body.dark-mode .nav-tabs > li > a {
+  color: #c8cee8 !important;
+  background-color: #16213e !important;
+  border-color: #0f3460 !important;
+}
+body.dark-mode .nav-tabs > li.active > a,
+body.dark-mode .nav-tabs > li.active > a:hover,
+body.dark-mode .nav-tabs > li.active > a:focus {
+  background-color: #0f3460 !important;
+  color: #ffffff !important;
+  border-color: #0f3460 #0f3460 transparent !important;
+}
+body.dark-mode .tab-content { background-color: #1a1a2e !important; }
+
+/* ── Panels & Wells ───────────────────────────────────────────────────────── */
+body.dark-mode .well {
+  background-color: #16213e !important;
+  border-color: #0f3460 !important;
+  color: #dde1f0 !important;
+}
+body.dark-mode .panel,
+body.dark-mode .panel-default {
+  background-color: #16213e !important;
+  border-color: #0f3460 !important;
+}
+body.dark-mode .panel-heading {
+  background-color: #0f3460 !important;
+  color: #dde1f0 !important;
+}
+body.dark-mode .panel-body { color: #dde1f0 !important; }
+
+/* ── Inline colour overrides (attribute selectors beat specificity) ────────
+   CSS !important overrides inline style= attributes.                        */
+body.dark-mode [style*="color:black"],
+body.dark-mode [style*="color: black"]          { color: #dde1f0 !important; }
+
+body.dark-mode [style*="background-color:lavender"],
+body.dark-mode [style*="background-color: lavender"] {
+  background-color: #25254a !important;
+  color: #dde1f0 !important;
+}
+body.dark-mode [style*="background-color:papayawhip"],
+body.dark-mode [style*="background-color: papayawhip"] {
+  background-color: #362a14 !important;
+  color: #dde1f0 !important;
+}
+body.dark-mode [style*="background-color:lightyellow"],
+body.dark-mode [style*="background-color: lightyellow"] {
+  background-color: #252e1a !important;
+  color: #dde1f0 !important;
+}
+body.dark-mode [style*="background-color:white"],
+body.dark-mode [style*="background-color: white"] {
+  background-color: #1e2235 !important;
+  color: #dde1f0 !important;
+}
+body.dark-mode [style*="background-color:#BFF7BB"] {
+  background-color: #1a3a1a !important;
+  color: #dde1f0 !important;
+}
+body.dark-mode [style*="border:1px solid black"],
+body.dark-mode [style*="border: 1px solid black"] {
+  border-color: #4a6fa5 !important;
+}
+
+/* ── Form controls (selectInput, textInput, sliderInput) ─────────────────── */
+body.dark-mode .form-control,
+body.dark-mode select,
+body.dark-mode input[type="text"],
+body.dark-mode input[type="number"],
+body.dark-mode textarea {
+  background-color: #16213e !important;
+  color: #dde1f0 !important;
+  border-color: #4a6fa5 !important;
+}
+body.dark-mode .selectize-input {
+  background-color: #16213e !important;
+  color: #dde1f0 !important;
+  border-color: #4a6fa5 !important;
+}
+body.dark-mode .selectize-dropdown {
+  background-color: #16213e !important;
+  color: #dde1f0 !important;
+  border-color: #4a6fa5 !important;
+}
+body.dark-mode .selectize-dropdown .option:hover,
+body.dark-mode .selectize-dropdown .active {
+  background-color: #0f3460 !important;
+}
+
+/* ── Sliders ─────────────────────────────────────────────────────────────── */
+body.dark-mode .irs--shiny .irs-line  { background: #4a6fa5 !important; }
+body.dark-mode .irs--shiny .irs-bar   { background: #4a6fa5 !important; }
+body.dark-mode .irs--shiny .irs-from,
+body.dark-mode .irs--shiny .irs-to,
+body.dark-mode .irs--shiny .irs-single { background: #4a6fa5 !important; }
+body.dark-mode .irs--shiny .irs-handle { background: #8ab4f8 !important; }
+body.dark-mode .irs-min, body.dark-mode .irs-max { color: #9ab !important; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+body.dark-mode .btn-default {
+  background-color: #16213e !important;
+  color: #dde1f0 !important;
+  border-color: #4a6fa5 !important;
+}
+body.dark-mode .btn-default:hover {
+  background-color: #1e3a5e !important;
+}
+body.dark-mode .btn-primary {
+  background-color: #4a6fa5 !important;
+  border-color: #3a5f95 !important;
+}
+
+/* ── DataTables (DT) ─────────────────────────────────────────────────────── */
+body.dark-mode .dataTables_wrapper,
+body.dark-mode .dataTables_wrapper .dataTables_length,
+body.dark-mode .dataTables_wrapper .dataTables_filter,
+body.dark-mode .dataTables_wrapper .dataTables_info,
+body.dark-mode .dataTables_wrapper .dataTables_processing { color: #dde1f0 !important; }
+body.dark-mode table.dataTable { background-color: #16213e !important; color: #dde1f0 !important; }
+body.dark-mode table.dataTable thead th,
+body.dark-mode table.dataTable thead td {
+  background-color: #0f3460 !important;
+  color: #dde1f0 !important;
+  border-color: #4a6fa5 !important;
+}
+body.dark-mode table.dataTable tbody tr { background-color: #16213e !important; }
+body.dark-mode table.dataTable tbody tr:nth-child(even) { background-color: #1e2a4a !important; }
+body.dark-mode table.dataTable tbody tr:hover { background-color: #1e3a5e !important; }
+body.dark-mode .dataTables_paginate .paginate_button { color: #c8cee8 !important; }
+body.dark-mode .dataTables_paginate .paginate_button.current {
+  background: #0f3460 !important;
+  color: #fff !important;
+  border-color: #4a6fa5 !important;
+}
+
+/* ── reactable ───────────────────────────────────────────────────────────── */
+body.dark-mode .rt-table  { background: #16213e !important; color: #dde1f0 !important; }
+body.dark-mode .rt-th     { background: #0f3460 !important; color: #dde1f0 !important; border-color: #4a6fa5 !important; }
+body.dark-mode .rt-td     { border-color: #1e2a4a !important; }
+body.dark-mode .rt-tr-group:nth-child(even) .rt-td { background: #1e2a4a !important; }
+body.dark-mode .rt-tr:hover .rt-td { background: #1e3a5e !important; }
+
+/* ── Modal dialogs ───────────────────────────────────────────────────────── */
+body.dark-mode .modal-content  { background-color: #16213e !important; color: #dde1f0 !important; }
+body.dark-mode .modal-header   { border-color: #0f3460 !important; }
+body.dark-mode .modal-footer   { border-color: #0f3460 !important; }
+
+/* ── Sortable (Step 2 variable selection) ────────────────────────────────── */
+body.dark-mode .rank-list-item {
+  background-color: #16213e !important;
+  color: #dde1f0 !important;
+  border-color: #4a6fa5 !important;
+}
+
+/* ── Misc ────────────────────────────────────────────────────────────────── */
+body.dark-mode hr          { border-color: #4a6fa5 !important; }
+body.dark-mode a           { color: #8ab4f8 !important; }
+body.dark-mode label       { color: #dde1f0 !important; }
+body.dark-mode h1, body.dark-mode h2, body.dark-mode h3,
+body.dark-mode h4, body.dark-mode h5, body.dark-mode h6 { color: #dde1f0 !important; }
+body.dark-mode .shiny-html-output { color: #dde1f0 !important; }
+
+/* ── Dark-mode toggle button (fixed top-right) ───────────────────────────── */
+#toggle_dark_mode {
+  border-radius: 50% !important;
+  width: 36px;
+  height: 36px;
+  padding: 0 !important;
+  line-height: 36px;
+  font-size: 15px;
+  position: fixed;
+  top: 12px;
+  right: 18px;
+  z-index: 9999;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  transition: background-color 0.2s, color 0.2s;
+}
+body.dark-mode #toggle_dark_mode {
+  background-color: #0f3460 !important;
+  color: #ffd700 !important;
+  border-color: #4a6fa5 !important;
+}
