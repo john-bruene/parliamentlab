@@ -18,6 +18,9 @@ library(sparkline)
 library(scales)
 library(gridExtra)
 
+# Null-coalescing operator (available in R 4.4+ as |>, replicated here for safety)
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
+
 # Local parliament layout — replaces ggparliament package dependency.
 # Provides: parliament_data_local(), geom_parliament_seats_local(),
 #           theme_ggparliament_local()
@@ -45,14 +48,10 @@ timed <- if (.PROFILE) {
 # coord1D / coord2D_red sign flips for P7-P9 are baked in; see the
 # conversion script for details. Regenerate the .rds files whenever the
 # source CSV / XLSX change.
-P6 <- timed("readRDS P6_umap", readRDS("data/P6_umap.rds"))
-P7 <- timed("readRDS P7_umap", readRDS("data/P7_umap.rds"))
-P8 <- timed("readRDS P8_umap", readRDS("data/P8_umap.rds"))
-P9 <- timed("readRDS P9_umap", readRDS("data/P9_umap.rds"))
+# Parliament data is lazy-loaded per session (see parl_cache inside shinyServer).
+# Only the selected legislature is kept in memory — ~3× RAM saving vs loading all 4.
 
-EP6_9_Voted <- timed("readRDS EP6_9_Voted", readRDS("data/EP6_9_Voted.rds"))
-
-# SHP_0 loaded once globally — previously re-read on every countryMapPlot render
+# SHP_0 loaded once globally — shared across all sessions, rarely changes
 SHP_0 <- timed("readRDS SHP_0", readRDS("data/SHP_0.rds"))
 
 five_thirty <- read.csv("www/clustered_congress.csv")
@@ -69,9 +68,53 @@ five_thirty <- read.csv("www/clustered_congress.csv")
 
 
 shinyServer(function(input, output, session) {
-  
 
-  
+  # ── Per-session lazy data cache ─────────────────────────────────────────────
+  # Each session only loads the parliament(s) it actually uses.
+  # Switching legislature within a session caches the new dataset but keeps
+  # the previous one; the typical single-parliament session uses ~1/4 the RAM
+  # of the old approach (all 4 loaded at startup for every session).
+  parl_cache  <- reactiveValues(P6 = NULL, P7 = NULL, P8 = NULL, P9 = NULL)
+  voted_cache <- reactiveVal(NULL)   # load_voted() — only needed for DW-NOM/MCA/UMAP re-run
+
+  load_parl <- function(p) {
+    if (is.null(parl_cache[[p]])) {
+      qs_path <- paste0("data/", p, "_umap.qs")
+      if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
+        parl_cache[[p]] <- timed(paste("qs::qread", p), qs::qread(qs_path))
+      } else {
+        parl_cache[[p]] <- timed(paste("readRDS", p), readRDS(paste0("data/", p, "_umap.rds")))
+      }
+    }
+    parl_cache[[p]]
+  }
+
+  load_voted <- function() {
+    if (is.null(voted_cache())) {
+      qs_path <- "data/EP6_9_Voted.qs"
+      if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
+        voted_cache(timed("qs::qread EP6_9_Voted", qs::qread(qs_path)))
+      } else {
+        voted_cache(timed("readRDS EP6_9_Voted", readRDS("data/EP6_9_Voted.rds")))
+      }
+    }
+    voted_cache()
+  }
+
+  # ── Best clustering defaults (from thesis, Section 6) ──────────────────────
+  # UMAP + HDBSCAN consistently yielded the highest silhouette scores.
+  # Used to auto-initialise Step 5 when the user skips Steps 2–4.
+  best_defaults <- list(
+    P6 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 25, n_clusters = 5,
+              umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.785),
+    P7 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 25, n_clusters = 5,
+              umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.844),
+    P8 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 8,
+              umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.820),
+    P9 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 7,
+              umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.811)
+  )
+
   clusterPlotObject <- reactiveVal(NULL)
   finalClusterPlotObject <- reactiveVal(NULL)
 
@@ -298,18 +341,10 @@ shinyServer(function(input, output, session) {
   
   
   
-  #reactive part for polls
+  # Reactive parliament data — loads from disk on first access, cached for session
   data_react <- reactive({
-    if (input$selectedP == "P9") {
-      data_parliament <- P9
-    } else if (input$selectedP == "P8") {
-      data_parliament <- P8
-    } else if (input$selectedP == "P7") {
-      data_parliament <- P7
-    } else if (input$selectedP == "P6") {
-      data_parliament <- P6
-    } 
-    return(data_parliament)
+    req(input$selectedP)
+    load_parl(input$selectedP)
   })
    
   # output$RawData <- DT::renderDataTable(
@@ -701,18 +736,9 @@ shinyServer(function(input, output, session) {
         )
       })
       
-      # Update the dropdown to show only engineered features, with Age as the default if present
-      output$variableSelectorUI2 <- renderUI({
-        selectInput(
-          inputId = "selectedVariable2",
-          label = "Variable to Visualize:",
-          choices = newly_engineered_features,  # Show only engineered features
-          selected = if ("Age" %in% newly_engineered_features) "Age" else newly_engineered_features[1]  # Default to "Age" if available
-        )
-      })
-      
-      
-      
+      # variableSelectorUI2 is now a standalone renderUI (see ### EXPLORATORY ###)
+      # that reacts to engineered_features() — no separate registration needed here.
+
       # Dynamisch erzeugtes selectInput nur anzeigen, wenn Features vorhanden sind
       output$variableSelectorUI1 <- renderUI({
         # Check if there are engineered features
@@ -1090,8 +1116,49 @@ shinyServer(function(input, output, session) {
   ###################
   
   ### EXPLORATORY ###
-  
-  
+
+  # ── Fallback data for Step 3 ────────────────────────────────────────────────
+  # If Step 2 (data preparation) has not been run, Step 3 works directly on
+  # the lazy-loaded raw parliament data so exploration is always available.
+  # Column aliases are added so downstream code (parliament plot, filters) that
+  # expects the Step-2 canonical names (Age, Name) still works on raw data.
+  explo_data <- reactive({
+    if (!is.null(datasets$transformedData)) return(datasets$transformedData)
+    d <- data_react()
+    if (is.null(d)) return(NULL)
+    if (!"Name"  %in% colnames(d) && "FullName"     %in% colnames(d)) d$Name  <- d$FullName
+    if (!"Age"   %in% colnames(d) && "Age_At_Start" %in% colnames(d)) d$Age   <- d$Age_At_Start
+    if (!"Photo" %in% colnames(d)) d$Photo <- NA_character_
+    d
+  })
+
+  # Columns available for exploration in the raw parliament data
+  # (mirrors what the Feature Engineering step typically produces)
+  .explo_default_vars <- c(
+    "Attendance_Score", "Winning_Score", "loyalty_score", "Activity_Index",
+    "economic_votesScore", "social_votesScore", "foreign_policy_votesScore",
+    "industry_votesScore", "education_votesScore", "budget_votesScore",
+    "Age_At_Start", "Experience_at_Start", "coord1D_red", "coord2D_red"
+  )
+
+  # Single reactive variable selector for Step 3 — uses engineered features when
+  # Step 2 has been run, otherwise shows the preset defaults from raw data.
+  output$variableSelectorUI2 <- renderUI({
+    feats <- engineered_features()
+    if (length(feats) > 0) {
+      choices <- feats
+      sel    <- if ("Age" %in% choices) "Age" else choices[1]
+    } else {
+      d       <- explo_data()
+      choices <- .explo_default_vars[.explo_default_vars %in% colnames(d)]
+      if (length(choices) == 0) return(NULL)
+      sel     <- if ("loyalty_score" %in% choices) "loyalty_score" else choices[1]
+    }
+    selectInput("selectedVariable2", "Variable to Visualize:",
+                choices = choices, selected = sel)
+  })
+
+
   ##### SUMMARY TABLE #####
   
   # RenderUI für Summary Table
@@ -1101,7 +1168,7 @@ shinyServer(function(input, output, session) {
     req(input$selectedVariable2)  # Nur weiterfahren, wenn eine Variable ausgewählt ist
     
     # Holen der EPG-Kurzbezeichnungen aus den axis_labels
-    data <- datasets$transformedData
+    data <- explo_data()
     settings <- get_party_settings()
     axis_labels <- settings$axis_labels  # Kurzbezeichnungen der Parteien für den Boxplot
     
@@ -1163,8 +1230,8 @@ shinyServer(function(input, output, session) {
   output$extendedBoxPlot <- renderPlot({
     req(input$selectedVariable2)
     
-    # Use transformed data instead of data_react()
-    data <- datasets$transformedData
+    # Use exploratory data (transformedData if Step 2 done, else raw parliament data)
+    data <- explo_data()
     req(data)
     settings <- get_party_settings()
     
@@ -1202,7 +1269,8 @@ shinyServer(function(input, output, session) {
   # Plot rendern und Daten verarbeiten
   output$countryMapPlot <- renderPlot({
     req(input$selectedVariable2)  # Sicherstellen, dass eine Variable ausgewählt ist
-    req(datasets$transformedData)
+    d <- explo_data()
+    req(d)
 
     # SHP_0 loaded globally at startup — no readRDS here
     
@@ -1227,8 +1295,8 @@ shinyServer(function(input, output, session) {
       st_as_sf() %>%
       st_transform(crs = 4326)
     
-    # Daten vorbereiten: transformierte Daten aggregieren nach Land
-    aggregated_data <- datasets$transformedData %>%
+    # Daten vorbereiten: aggregieren nach Land
+    aggregated_data <- d %>%
       group_by(Country) %>%
       summarize(mean_value = mean(.data[[input$selectedVariable2]], na.rm = TRUE)) %>%
       left_join(country_codes, by = "Country")  # Ländercodes hinzufügen
@@ -1260,18 +1328,20 @@ shinyServer(function(input, output, session) {
         legend.title = element_text(size = 12),
         legend.text = element_text(size = 10)
       )
-  })
-  
-  
-  
-  
+  }) %>% bindCache(input$selectedP, input$selectedVariable2,
+                   is.null(datasets$transformedData), cache = "session")
+
+
+
+
   # Tabelle der Top 3 und Last 3 Länder
   output$tabletop <- renderReactable({
     req(input$selectedVariable2)
-    req(datasets$transformedData)
+    d <- explo_data()
+    req(d)
 
     # Aggregieren der Daten und Hinzufügen von Platzierungen
-    aggregated_data <- datasets$transformedData %>%
+    aggregated_data <- d %>%
       group_by(Country) %>%
       summarize(mean_value = mean(.data[[input$selectedVariable2]], na.rm = TRUE)) %>%
       arrange(desc(mean_value)) %>%
@@ -1413,7 +1483,7 @@ shinyServer(function(input, output, session) {
       legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9)
       
       # Filter data based on selected Parliament and relevant votes
-      relevant_votes <- EP6_9_Voted %>%
+      relevant_votes <- load_voted() %>%
         filter(Legislature == legislature_map[input$selectedP]) %>%
         {
           if (input$use_final_votes_only) {
@@ -1544,7 +1614,7 @@ shinyServer(function(input, output, session) {
     legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9)
     
     # Filter data based on selected Parliament and relevant votes
-    EP6_9 <- EP6_9_Voted %>%
+    EP6_9 <- load_voted() %>%
       filter(Legislature == legislature_map[input$selectedP])
     
     variable_contributions_processed <- variable_contributions %>%
@@ -1554,19 +1624,19 @@ shinyServer(function(input, output, session) {
     variable_contributions_processed <- variable_contributions_processed %>%
       mutate(Vote_ID = as.integer(Vote_ID))
     
-    EP6_9_Voted_processed <- EP6_9 %>%
+    EP6_9_processed <- EP6_9 %>%
       mutate(Vote_ID = as.integer(Vote_ID))
-    
+
     # Schritt 3: Dynamische Identifikation der Dimensionen (Dim1, Dim2, ...)
     dim_cols_pattern <- "^Dim\\s*\\d+$"
     dim_cols <- names(variable_contributions_processed)[grepl(dim_cols_pattern, names(variable_contributions_processed), ignore.case = TRUE)]
-    
+
     if (length(dim_cols) == 0) {
       stop("Keine Dimensionsspalten in variable_contributions gefunden.")
     }
-    
+
     # Schritt 4: Left Join der Datensätze und Auffüllen fehlender Beiträge mit 0
-    merged_data <- EP6_9_Voted_processed %>%
+    merged_data <- EP6_9_processed %>%
       select(Vote_ID, main_policy_name) %>%
       left_join(variable_contributions_processed %>% select(Vote_ID, all_of(dim_cols)), by = "Vote_ID") %>%
       mutate(across(all_of(dim_cols), ~replace_na(.x, 0)))
@@ -1614,7 +1684,7 @@ shinyServer(function(input, output, session) {
       legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9)
       
       # Filter data based on selected Parliament and relevant votes
-      relevant_votes <- EP6_9_Voted %>%
+      relevant_votes <- load_voted() %>%
         filter(Legislature == legislature_map[input$selectedP]) %>%
         {
           if (input$use_final_votes_only) {
@@ -2569,11 +2639,11 @@ shinyServer(function(input, output, session) {
         theme_minimal() +
         theme(legend.position = "bottom", legend.title = element_text(size = 12), legend.text = element_text(size = 8))
     }
-  })
+  }) %>% bindCache(input$clusters, input$use_party_colors)
 
-  
-  
-  
+
+
+
   output$clusterPie <- renderPlot({
     set.seed(123)  # Set the random seed for reproducibility
     
@@ -2663,9 +2733,9 @@ shinyServer(function(input, output, session) {
         scale_fill_manual(values = group_colors) +
         theme(legend.position = "none")
     }
-  })
-  
-  
+  }) %>% bindCache(input$clusters, input$use_party_colors)
+
+
   output$ReadMore <- renderUI({
     selected <- input$selectedMetric
     switch(selected,
@@ -2755,9 +2825,12 @@ shinyServer(function(input, output, session) {
     colnames(data) <- c("party_name_short", "member_name", "photo", "Age", "Gender", "Activity_Index", "seats", "seats_total", "left_right")
     
 
-    # Create the 'selected' variable using 'filteredData$Name' (ensure matching column names)
+    # 'selected' = TRUE for MEPs that survive the filter panel.
+    # Check both $full and $Name so it works whether data comes from Step 2
+    # (transformedData, which has 'full') or raw parliament data (which has 'Name').
+    filter_keys <- unique(c(filteredData$full, filteredData$Name))
     data <- data %>%
-      mutate(selected = ifelse(member_name %in% filteredData$full, TRUE, FALSE))
+      mutate(selected = member_name %in% filter_keys)
     
     # Handle NAs in 'member_name' (if any)
     data$selected[is.na(data$member_name)] <- FALSE
@@ -2826,7 +2899,7 @@ shinyServer(function(input, output, session) {
     })
     
     # Adjust the legend layout
-    interactive_parliament_plot <- interactive_parliament_plot %>% 
+    interactive_parliament_plot <- interactive_parliament_plot %>%
       layout(
         legend = list(orientation = "h",   # Move the legend to the bottom
                       x = 0.5,             # Center the legend horizontally
@@ -2843,9 +2916,12 @@ shinyServer(function(input, output, session) {
   
   
   # Reactive expression for filtered data
-  filteredData <- reactive({
-    data <- datasets$transformedData
-    req(data)  # Guard: wait for data pipeline to complete
+  # debounce(400 ms) collapses rapid slider-drag events — prevents
+  # thundering-herd re-renders while the user moves Age / Activity sliders.
+  # Parliament chart (Plotly) + filterSummary only fire once the user pauses.
+  filteredData_raw <- reactive({
+    data <- explo_data()
+    req(data)  # Guard: wait for data to be available
 
     # Dynamic filter inputs are rendered AFTER data is loaded.
     # req() here ensures filteredData waits until all four sliders/selects exist.
@@ -2886,13 +2962,14 @@ shinyServer(function(input, output, session) {
     
     return(data)
   })
-  
-  
-  
-  # Initialize default values after data is loaded
+  filteredData <- debounce(filteredData_raw, 400)
+
+
+
+  # Initialize filter sliders as soon as data is available (Step 2 or raw fallback)
   observe({
-    data <- datasets$transformedData
-    req(data)  # Guard: don't run until transformation step is complete
+    data <- explo_data()
+    req(data)
 
     # Age Slider
     output$ageSliderUI <- renderUI({
@@ -2927,7 +3004,7 @@ shinyServer(function(input, output, session) {
   
   # Reset filters
   observeEvent(input$resetFilters, {
-    data <- datasets$transformedData
+    data <- explo_data()
     
     # Reset Age Slider
     updateSliderInput(session, "ageRange",
@@ -2953,10 +3030,11 @@ shinyServer(function(input, output, session) {
   })
   
   output$filterSummary <- renderPrint({
-    req(datasets$transformedData)
-    total_rows <- nrow(datasets$transformedData)
+    d <- explo_data()
+    req(d)
+    total_rows <- nrow(d)
     filtered_rows <- nrow(filteredData())
-    na_counts <- sapply(datasets$transformedData[, c("Age", "Activity_Index", "Gender", "Country")], function(x) sum(is.na(x)))
+    na_counts <- sapply(d[, intersect(c("Age", "Activity_Index", "Gender", "Country"), colnames(d)), drop = FALSE], function(x) sum(is.na(x)))
     
     list(
       Total_Rows = total_rows,
@@ -2974,11 +3052,12 @@ shinyServer(function(input, output, session) {
   
   # Render Parliament Plot
   output$parliamentPlot <- renderPlotly({
-    
-    req(datasets$transformedData)  # Ensure the data is available
-    
-    fullData <- datasets$transformedData
-    fullData$Name <- fullData$full
+
+    fullData <- explo_data()
+    req(fullData)
+    # Ensure Name column exists (aliased from FullName in raw data by explo_data())
+    if (!"Name" %in% colnames(fullData) && "full" %in% colnames(fullData))
+      fullData$Name <- fullData$full
     
     # Convert the party colors into a tibble
     settings <- get_party_settings()
@@ -3031,9 +3110,9 @@ shinyServer(function(input, output, session) {
   observeEvent(event_data("plotly_click", source = "parliamentPlot"), {
     click_data <- event_data("plotly_click", source = "parliamentPlot")
     
-    data <- datasets$transformedData  # Use the selected dataset
+    data <- explo_data()
     req(data)
-    data$Name <- data$full
+    if (!"Name" %in% colnames(data) && "full" %in% colnames(data)) data$Name <- data$full
     
     if (!is.null(click_data)) {
       clicked_name <- click_data$key
@@ -3094,20 +3173,118 @@ shinyServer(function(input, output, session) {
   
   ##### RESULTS #####
   clusteringCompleted <- reactiveVal(FALSE)
-  
-  
+
+  # ── Shared helper: load best defaults for parliament p ──────────────────────
+  do_load_best <- function(p) {
+    # ── Fast path: precomputed cluster assignment (baked into Docker image) ─────
+    # Generated by precompute_all.R — see that script or the Dockerfile RUN step.
+    precomp_path <- paste0("data/", p, "_best_clusters.rds")
+    if (file.exists(precomp_path)) {
+      umap_data <- readRDS(precomp_path)
+      datasets$umap_data <- umap_data
+      selected_mapping("UMAP")
+      clusteringCompleted(TRUE)
+      return(invisible(TRUE))
+    }
+    # ── Slow path: compute HDBSCAN on the fly (precomp file missing) ───────────
+    defs <- best_defaults[[p]]
+    data <- load_parl(p)
+    if (is.null(data)) return(invisible(FALSE))
+
+    needed <- c(defs$umap_x, defs$umap_y,
+                "EPG", "FullName", "Country", "Party", "Photo",
+                "Age_At_Start", "Experience_at_Start", "Gender",
+                "Winning_Score", "Attendance_Score", "loyalty_score", "Activity_Index",
+                "economic_votesScore", "social_votesScore", "foreign_policy_votesScore",
+                "industry_votesScore", "education_votesScore", "budget_votesScore",
+                "coord1D_red", "coord2D_red")
+    needed <- needed[needed %in% colnames(data)]
+    umap_data <- data[, needed, drop = FALSE]
+
+    if (defs$umap_x %in% colnames(umap_data))
+      colnames(umap_data)[colnames(umap_data) == defs$umap_x] <- "UMAP1"
+    if (defs$umap_y %in% colnames(umap_data))
+      colnames(umap_data)[colnames(umap_data) == defs$umap_y] <- "UMAP2"
+
+    umap_data$Name                 <- umap_data$FullName
+    umap_data$Age                  <- umap_data$Age_At_Start
+    umap_data$Experience           <- umap_data$Experience_at_Start
+    umap_data$Sex                  <- umap_data$Gender
+    umap_data$Winning_Index        <- umap_data$Winning_Score
+    umap_data$Attendance_Index     <- umap_data$Attendance_Score
+    umap_data$Loyalty_Index        <- umap_data$loyalty_score
+    umap_data$Economy_Score        <- umap_data$economic_votesScore
+    umap_data$Social_Score         <- umap_data$social_votesScore
+    umap_data$Foreign_Policy_Score <- umap_data$foreign_policy_votesScore
+    umap_data$Industry_Score       <- umap_data$industry_votesScore
+    umap_data$Education_Score      <- umap_data$education_votesScore
+    umap_data$Budget_Score         <- umap_data$budget_votesScore
+
+    valid_rows <- complete.cases(umap_data[, c("UMAP1", "UMAP2")])
+    umap_data  <- umap_data[valid_rows, , drop = FALSE]
+
+    if (nrow(umap_data) < defs$minPts) {
+      showNotification(
+        paste0("Not enough valid UMAP rows (", nrow(umap_data),
+               ") for minPts=", defs$minPts),
+        type = "error", duration = 8
+      )
+      return(invisible(FALSE))
+    }
+
+    hdb <- dbscan::hdbscan(umap_data[, c("UMAP1", "UMAP2")], minPts = defs$minPts)
+    umap_data$Cluster <- as.factor(hdb$cluster)
+
+    datasets$umap_data <- umap_data
+    selected_mapping("UMAP")
+    clusteringCompleted(TRUE)
+    invisible(TRUE)
+  }
+
+  # ── Auto-load on startup and on every legislature switch ────────────────────
+  # ignoreInit = FALSE so it fires immediately when the session starts with
+  # the default parliament (P9), giving users the exploration view right away.
+  # Switching parliament resets and re-runs automatically.
+  observeEvent(input$selectedP, {
+    req(input$selectedP)
+    clusteringCompleted(FALSE)
+    do_load_best(input$selectedP)
+  }, ignoreNULL = TRUE, ignoreInit = FALSE)
+
+  # ── Manual reload button (re-runs even if results already shown) ─────────────
+  observeEvent(input$load_best_results, {
+    req(input$selectedP)
+    do_load_best(input$selectedP)
+  })
+
   # Tab Panel for Step 5: Results
   output$resultsContent <- renderUI({
     if (!clusteringCompleted()) {
-      # Placeholder content
+      p    <- input$selectedP %||% "P9"
+      defs <- best_defaults[[p]]
       tagList(
         tags$div(
-          style = "text-align: center; padding: 50px;",
-          tags$h3("Clustering Not Completed"),
-          tags$p("Please complete the clustering process to view the results."),
-          tags$img(src = "placeholder-image.png", width = "600px", height = "auto", style = "border:2px solid black;"),
+          style = "text-align: center; padding: 40px;",
+          tags$h3("No clustering results yet"),
+          tags$p("You can either work through Steps 2–4 to customise the analysis,",
+                 "or load the recommended defaults for this legislature right now."),
+          tags$div(
+            style = "margin: 20px auto; padding: 20px; max-width: 520px;
+                     background: #f8f8f8; border-radius: 10px; border: 1px solid #ddd;",
+            tags$h4(paste("Recommended for Parliament", p)),
+            tags$p(style = "color:#555;",
+              "Method: UMAP + HDBSCAN",   tags$br(),
+              paste("minPts:", defs$minPts), tags$br(),
+              paste("Expected clusters:", defs$n_clusters), tags$br(),
+              paste("Silhouette score:", defs$silhouette)
+            ),
+            actionButton("load_best_results", "Load recommended results",
+                         class = "btn btn-primary btn-lg",
+                         icon = icon("bolt"))
+          ),
           br(),
-          br()
+          tags$img(src = "placeholder-image.png", width = "500px",
+                   height = "auto", style = "border:2px solid #ccc; opacity:0.6;")
         )
       )
     } else {
@@ -3187,11 +3364,7 @@ shinyServer(function(input, output, session) {
         fluidRow(
           column(
             width = 6,
-            h3("DW-NOMINATE 1nd Dimension Score Distribution"),
-            conditionalPanel(
-              condition = "output.dwNominatePlot== null",
-              p("The Plot will appear here after performing the clustering. Make sure to finish the clustering process."),
-              style = "border:1px solid black; padding:10px; background-color:lightyellow;"),
+            h3("DW-NOMINATE 1st Dimension Score Distribution"),
             plotOutput("dwNominatePlot", width = "500px")
           ),
           column(
@@ -3241,6 +3414,17 @@ shinyServer(function(input, output, session) {
   #################
   
   
+  # Human-readable label for the global legislature selector display
+  output$selected_period_label <- renderText({
+    labels <- c(
+      P6 = "6th Parliament (2004–2009)",
+      P7 = "7th Parliament (2009–2014)",
+      P8 = "8th Parliament (2014–2019)",
+      P9 = "9th Parliament (2019–2024)"
+    )
+    labels[input$selectedP %||% "P9"]
+  })
+
   output$dynamicTitle <- renderUI({
     data <- get_selected_data()
     
@@ -3707,7 +3891,7 @@ shinyServer(function(input, output, session) {
               panel.grid = element_blank(),
               plot.background = element_rect(fill = "white", color = NA)
             )
-          
+
           print(waffle_chart)
         })
         

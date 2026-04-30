@@ -5,7 +5,8 @@ library(plotly)
 library(shinyBS)
 library(shinyjs)
 library(reactable)
-library(bslib)  # needed for input_switch() on line ~633
+library(bslib)
+library(shinycssloaders)
 
 
 # Define EPG colors
@@ -24,21 +25,73 @@ epg_colors <- c(
 
 shinyUI(fluidPage(
   theme = shinytheme("lumen"),  # Apply the Lumen theme
-  
+
   useShinyjs(),  # Enable shinyjs for interactivity
-  
-  # Custom CSS for the highlight effect
+
   tags$style(HTML("
-    .highlight {
-      background-color: #d4f7d4 !important;
-      border-radius: 10px;
-      padding: 5px;
+    /* Highlight effect */
+    .highlight { background-color: #d4f7d4 !important; border-radius: 10px; padding: 5px; }
+
+    /* Clean plot panel — replaces lightyellow containers */
+    .plot-panel {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
     }
+
+    /* Info callout boxes (replaces lightyellow text blocks) */
+    .info-callout {
+      border-left: 4px solid #5b9bd5;
+      background: #f0f6ff;
+      border-radius: 0 6px 6px 0;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      color: #222;
+    }
+
+    /* Spinner colour tweak */
+    .shiny-spinner-output-container { min-height: 60px; }
   ")),
                   
 
-  titlePanel("Silent Parties: A Cluster Analysis of Voting Behavior in the European Parliament"),
-    navbarPage("Content",
+  titlePanel("ParliamentLab: A Cluster Analysis of Voting Behavior in the European Parliament"),
+
+  # Global legislature selector — sits between the title and the navigation tabs
+  tags$style(HTML("
+    .legislature-bar {
+      background: #f5f5f5;
+      border-bottom: 1px solid #ddd;
+      padding: 6px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 0;
+    }
+    .legislature-bar label { margin: 0; font-weight: bold; color: #555; }
+    .legislature-bar .form-group { margin: 0; }
+    .legislature-bar .selectize-input { min-height: 30px; padding: 3px 8px; }
+    /* Ensure the open dropdown renders above the navbar tabs */
+    .legislature-bar .selectize-dropdown { z-index: 9999 !important; }
+  ")),
+  tags$div(
+    class = "legislature-bar",
+    tags$label("Legislature:"),
+    selectInput("selectedP", label = NULL,
+                choices = list(
+                  "6th Parliament (2004–2009)" = "P6",
+                  "7th Parliament (2009–2014)" = "P7",
+                  "8th Parliament (2014–2019)" = "P8",
+                  "9th Parliament (2019–2024)" = "P9"
+                ),
+                selected = "P9",
+                width = "220px"),
+    tags$span(style = "color:#888; font-size:13px;",
+              "Switch legislature at any time.")
+  ),
+
+  navbarPage("",
                tabPanel(icon("home"),
                         
                         fluidRow(column(
@@ -186,7 +239,7 @@ shinyUI(fluidPage(
                                      target = "_blank"),
                                    
                                    p("In the following tabs, this study will turn to similar data from the European Parliament, aiming to explore the same clustering challenge and investigate how representatives form latent voting blocs based on their behavior.",
-                                     style = "color:black;text-align:justify; background-color:lightyellow; padding:10px"),
+                                     class = "info-callout"),
 
 
                                    width = 8, style = "background-color:lavender;border-radius: 10px")
@@ -386,18 +439,16 @@ shinyUI(fluidPage(
                                       
                                        
                                        br(),
-                                       
-                                       # Period selection input
-                                       selectInput("selectedP", 
-                                                   p("Please select the legislative period you want to work with:", style="color:black; text-align:center"),
-                                                   choices = list(
-                                                     "6th: 2004 - 2009" = "P6",
-                                                     "7th: 2009 - 2014" = "P7",
-                                                     "8th: 2014 - 2019" = "P8",
-                                                     "9th: 2019 - 2024" = "P9"
-                                                   )
+
+                                       # Legislature shown (controlled by global bar at top)
+                                       tags$div(
+                                         style = "background:#e8f4e8; border-radius:6px; padding:8px 12px; margin-bottom:10px;",
+                                         tags$b("Active legislature: "),
+                                         textOutput("selected_period_label", inline = TRUE),
+                                         tags$span(style="color:#666; font-size:12px; display:block; margin-top:3px;",
+                                                   "Change using the bar above the navigation tabs.")
                                        ),
-                                       
+
                                        p("Choose one or more datasets to combine. Each dataset offers unique information:"),
                                        tags$ul(
                                          tags$li(tags$b("Eurowatch (Simon Hix):"), " Contains ideological scores and voting records, providing insights into the 
@@ -424,11 +475,6 @@ shinyUI(fluidPage(
                                        h4("Merged Data Preview"),
                                        
                                        # Placeholder message if data has not been merged yet
-                                       conditionalPanel(
-                                         condition = "output.mergedDataPreview == null",
-                                         p("The merged data preview will appear here after merging."),
-                                         style = "border:1px solid black; padding:10px; background-color:lightyellow;"),
-                                       
                                        # Data table output for preview
                                        DT::dataTableOutput("mergedDataPreview"),
                                        
@@ -719,24 +765,12 @@ shinyUI(fluidPage(
                      
                      hr(),
                      
-                     # UI für den Summary Table in der Hauptübersicht hinzufügen
                      fluidRow(
-                       column(width = 7,
-                              conditionalPanel(
-                                condition = "output.extendedBoxPlot == null",
-                                p("Please finish the Data Preparation first."),
-                                style = "padding:10px; background-color:lightyellow;"),
-                              plotOutput("extendedBoxPlot"),
-                              style = "border:1px solid black; padding:10px; background-color:lightyellow;"
-                              ),
-                       column(
-                         width = 5,
-                         conditionalPanel(
-                           condition = "output.extendedBoxPlot == null",
-                           p("Please finish the Data Preparation first."),
-                           style = "padding:10px; background-color:lightyellow;"),
-                         uiOutput("summaryTable"),
-                         style = "border:1px solid black; padding:10px; background-color:lightyellow;"
+                       column(width = 7, class = "plot-panel",
+                              withSpinner(plotOutput("extendedBoxPlot"), type = 4, color = "#5b9bd5")
+                       ),
+                       column(width = 5, class = "plot-panel",
+                              withSpinner(uiOutput("summaryTable"), type = 4, color = "#5b9bd5")
                        )
                      ),
                      
@@ -754,26 +788,15 @@ shinyUI(fluidPage(
                      
                      # Display tables and maps with added explanations
                      fluidRow(
-                       column(
-                         width = 7, 
-                         br(),
+                       column(width = 7, class = "plot-panel",
                          h4("Country Map"),
-                         p("The map visualizes the selected measure (such as attendance or voting alignment) by country. 
-             This can help you observe geographical patterns in the data, such as higher engagement in certain regions or countries with MEPs 
-             who tend to vote together."),
-                         plotOutput("countryMapPlot"), 
-                         br(), 
-                         style = "border:1px solid black; padding:10px; background-color:lightyellow;"
+                         p("The map shows the selected measure averaged by country — useful for spotting geographic patterns in MEP behavior."),
+                         withSpinner(plotOutput("countryMapPlot"), type = 4, color = "#5b9bd5")
                        ),
-                       column(
-                         width = 5, 
-                         br(),
-                         h4("Summary Table"),
-                         p("This table provides a summary of the selected variable(s) for each political group or country. Use this table to identify differences across groups, 
-             such as variations in average attendance scores or voting alignments. Sorting by mean can be useful for highlighting key trends and outliers."),
-                         reactableOutput("tabletop"), 
-                         br(), 
-                         style = "border:1px solid black; padding:10px; background-color:lightyellow;"
+                       column(width = 5, class = "plot-panel",
+                         h4("Top / Bottom Countries"),
+                         p("Countries ranked by average score for the selected variable."),
+                         withSpinner(reactableOutput("tabletop"), type = 4, color = "#5b9bd5")
                        )
 
                      ),
@@ -819,11 +842,7 @@ shinyUI(fluidPage(
                      
                      # Main panel for displaying the parliament plot
                      mainPanel(
-                       conditionalPanel(
-                         condition = "output.extendedBoxPlot == null",
-                         p("Please finish the Data Preparation first."),
-                         style = "padding:10px; background-color:lightyellow;"),
-                       plotlyOutput("parliamentPlot")  # Parliament plot takes up the main panel
+                       withSpinner(plotlyOutput("parliamentPlot"), type = 4, color = "#5b9bd5")
                      )
                      
                      
@@ -865,10 +884,10 @@ shinyUI(fluidPage(
                               tags$li(tags$b("Noise Reduction:"), " Focuses on the most informative dimensions, removing less relevant variability.")
                             ),
                             
-                            p("This tab focuses on reducing the dimensions of voting data to identify clusters of politicians with similar voting behavior. 
-       The scatterplot of raw data illustrates the difficulty of interpreting patterns in the original dimensions. The MCA scatterplot demonstrates how dimensionality reduction 
+                            p("This tab focuses on reducing the dimensions of voting data to identify clusters of politicians with similar voting behavior.
+       The scatterplot of raw data illustrates the difficulty of interpreting patterns in the original dimensions. The MCA scatterplot demonstrates how dimensionality reduction
        simplifies and clarifies these patterns, enabling better identification of clusters.",
-                              style = "color:black;text-align:justify; background-color:lightyellow; padding:10px"),
+                              class = "info-callout"),
                             
                             width = 8, style = "background-color:lavender;border-radius: 10px; padding:15px"
                           ),
@@ -894,29 +913,29 @@ shinyUI(fluidPage(
                             
                             # DW-NOMINATE Section
                             h4("1. DW-NOMINATE - A Political Spectrum Analysis", style = "color:black"),
-                            p("DW-NOMINATE is a widely used method in political science to map representatives onto a multidimensional ideological spectrum. 
-       It provides a detailed understanding of MEP alignments by placing them within an ideological context based on their voting behavior. 
-       This approach reveals ideological trends and bloc formations within the Parliament, helping us go beyond general clusters to locate each MEP’s position 
+                            p("DW-NOMINATE is a widely used method in political science to map representatives onto a multidimensional ideological spectrum.
+       It provides a detailed understanding of MEP alignments by placing them within an ideological context based on their voting behavior.
+       This approach reveals ideological trends and bloc formations within the Parliament, helping us go beyond general clusters to locate each MEP’s position
        on specific political dimensions.",
-                              style = "color:black;text-align:justify;background-color:lightyellow;padding:10px;border:1px solid black;border-radius:5px"),
-                            
+                              class = "info-callout"),
+
                             br(),
-                            
+
                             # MCA Section
                             h4("2. MCA - A Categorical Perspective", style = "color:black"),
-                            p("Multiple Correspondence Analysis (MCA) refines our understanding by focusing on relationships between categorical voting behaviors. 
-       This method is particularly helpful for data structured around discrete votes, as it identifies nuanced alignments between MEPs based on their voting responses. 
+                            p("Multiple Correspondence Analysis (MCA) refines our understanding by focusing on relationships between categorical voting behaviors.
+       This method is particularly helpful for data structured around discrete votes, as it identifies nuanced alignments between MEPs based on their voting responses.
        MCA creates a focused clustering structure tailored to parliamentary voting patterns.",
-                              style = "color:black;text-align:justify;background-color:lightyellow;padding:10px;border:1px solid black;border-radius:5px"),
-                            
+                              class = "info-callout"),
+
                             br(),
-                            
+
                             # UMAP Section
                             h4("3. UMAP - An Overview", style = "color:black"),
-                            p("UMAP (Uniform Manifold Approximation and Projection) is a flexible tool for reducing high-dimensional data into a simpler, lower-dimensional space. 
-       It provides an initial view into possible voting blocs within the Parliament, creating a visual representation of MEP voting data that highlights clusters 
+                            p("UMAP (Uniform Manifold Approximation and Projection) is a flexible tool for reducing high-dimensional data into a simpler, lower-dimensional space.
+       It provides an initial view into possible voting blocs within the Parliament, creating a visual representation of MEP voting data that highlights clusters
        without predefining any structure.",
-                              style = "color:black;text-align:justify;background-color:lightyellow;padding:10px;border:1px solid black;border-radius:5px"),
+                              class = "info-callout"),
                             
                             style = "background-color:papayawhip;border-radius:10px;padding:15px"
                           ),
@@ -957,18 +976,14 @@ shinyUI(fluidPage(
                                        hr(),
                  
                                        # Legislature Selection
-                                       selectInput("selectedP", 
-                                                   p("Select Parliament:", style = "color:black; text-align:center; font-weight:bold;"),
-                                                   choices = list(
-                                                     "6th: 2004 - 2009" = "P6",
-                                                     "7th: 2009 - 2014" = "P7",
-                                                     "8th: 2014 - 2019" = "P8",
-                                                     "9th: 2019 - 2024" = "P9"
-                                                   ),
-                                                   selected = "P7"),
-                                       bsTooltip("selectedP", 
-                                                 "Select the legislature you want to analyze from the dropdown menu.",
-                                                 "right"),
+                                       # Legislature shown (controlled by global bar at top)
+                                       tags$div(
+                                         style = "background:#e8f4e8; border-radius:6px; padding:8px 12px; margin-bottom:10px;",
+                                         tags$b("Active legislature: "),
+                                         textOutput("selected_period_label", inline = TRUE),
+                                         tags$span(style="color:#666; font-size:12px; display:block; margin-top:3px;",
+                                                   "Change using the bar above the navigation tabs.")
+                                       ),
                                        
                                        # Final Vote Checkbox
                                        checkboxInput("use_final_votes_only", 
@@ -1184,10 +1199,7 @@ shinyUI(fluidPage(
                                        
                                        fluidRow(
                                          column(width = 6, plotOutput("finalClusterPlot")),
-                                         column(width = 6,                               conditionalPanel(
-                                           condition = "output.clusterPlot == null",
-                                           p("Please run a clustering method first."),
-                                           style = "padding:10px; background-color:lightyellow;"), plotOutput("clusterPlot")),
+                                         column(width = 6, withSpinner(plotOutput("clusterPlot"), type = 4, color = "#5b9bd5")),
                                          style = "border:1px solid black"
                                        ),
                                        br(),

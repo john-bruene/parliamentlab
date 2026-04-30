@@ -27,7 +27,8 @@ RUN R -e "options(Ncpus = 4); \
   pkgs <- c('shiny','shinythemes','DT','ggplot2','dplyr','tidyr','scales','gridExtra', \
             'sortable','plotly','shinyBS','shinyjs','reactable', \
             'clusterCrit','umap','dbscan','FactoMineR', \
-            'packcircles','ggiraph','sf','sparkline','bslib'); \
+            'packcircles','ggiraph','sf','sparkline','bslib','shinycssloaders', \
+            'qs','profvis','shinyloadtest'); \
   install.packages(pkgs, repos = 'http://cran.rstudio.com/'); \
   missing <- setdiff(pkgs, rownames(installed.packages())); \
   if (length(missing) > 0) stop('install.packages failed for: ', paste(missing, collapse = ', '))"
@@ -37,6 +38,10 @@ RUN R -e "options(Ncpus = 4); \
 
 # Kopiere alle Dateien (inklusive ui.R, server.R, Daten, www, etc.) in den Shiny-Server-Ordner
 COPY . /srv/shiny-server/
+
+# Precompute: convert .rds → .qs (faster I/O) and bake in HDBSCAN cluster
+# assignments so that do_load_best() never has to run HDBSCAN at session start.
+RUN cd /srv/shiny-server && Rscript precompute_all.R
 
 # Exponiere den Standardport für Shiny (3838)
 EXPOSE 3838
