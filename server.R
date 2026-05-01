@@ -2568,76 +2568,75 @@ shinyServer(function(input, output, session) {
   
   
   output$clusterPlot_538 <- renderPlot({
-    set.seed(123)  # Set the random seed for reproducibility
-    
-    # Perform k-means clustering based on user-selected number of clusters
-    cluster_data <- five_thirty %>%
-      select(dw_nominate_dim1, dw_nominate_dim2) %>%
-      na.omit()
-    
-    #rename dw_nominate_dim1 and dw_nominate_dim2 to "nominate_dim1" and "nominate_dim2"
-    colnames(cluster_data) <- c("nominate_dim1", "nominate_dim2")
-    
-    km <- kmeans(cluster_data[, c("nominate_dim1", "nominate_dim2")], centers = input$clusters, nstart = 25)
-
-    # Add cluster assignments to the data
-    cluster_data$cluster <- as.factor(km$cluster)
-    
-    # Post-hoc labeling for clusters based on the selected number of clusters
-    cluster_labels <- switch(as.character(input$clusters),
-                             "2" = c("Group 1", "Group 2"),
-                             "3" = c("Group 1", "Group 2", "Group 3"),
-                             "4" = c("Group 1", "Group 2", "Group 3", "Group 4"),
-                             "5" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Progressive Democrats", "Core Democrats"),
-                             "6" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Progressive Democrats", "Core Democrats", "Moderate Democrats"),
-                             "7" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Progressive Democrats", "Core Democrats", "Moderate Democrats", "Far-Right Establishment"),
-                             "8" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Far-Right Establishment", "Far-Right Obstructionists", "Progressive Democrats", "Core Democrats", "Moderate Democrats"),
-                             "9" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Far-Right Establishment", "Far-Right Obstructionists", "Progressive Democrats", "Core Democrats", "Moderate Democrats", "Freedom Caucus"),
-                             "10" = c("Group 1", "Group 2", "Group 3", "Group 4", "Group 5", "Group 6", "Group 7", "Group 8", "Group 9", "Group 10"))
-    
-    # Ensure the cluster labels are assigned correctly
-    cluster_data$cluster_label <- factor(cluster_data$cluster, 
-                                         levels = 1:input$clusters, 
-                                         labels = cluster_labels[1:input$clusters])
-    
-    # Check if red/blue intensity mode is enabled
-    if (input$use_party_colors) {
-      # Color based on nominate_dim1 (extremity mapping to red/blue)
-      ggplot(cluster_data, aes(x = nominate_dim1, y = nominate_dim2, color = nominate_dim1)) +
-        geom_point(size = 4) +
-        scale_color_gradientn(colors = c("blue", "white", "red")) +  # Red for high values, blue for low
-        labs(title = paste("Clustering with", input$clusters, "Groups"),
-             x = "Nominate Dimension 1 (Liberal vs. Conservative)", 
-             y = "Nominate Dimension 2 (Establishment vs. Anti-Establishment)",
-             color = "Extremity") +  # Add label to the legend
-        theme_minimal() +
-        theme(legend.position = "bottom", legend.title = element_text(size = 12), legend.text = element_text(size = 8))
-      
+    # ── Data preparation ───────────────────────────────────────────────────────
+    # For k=8: use the pre-existing 538 cluster labels from the CSV directly.
+    # k-Means cluster numbers are arbitrary — mapping them post-hoc to names
+    # like "Progressive Democrats" is unreliable. The CSV already has the
+    # correct 5 Republican / 3 Democrat split from the original 538 analysis.
+    if (input$clusters == 8) {
+      cluster_data <- five_thirty %>%
+        filter(!is.na(dw_nominate_dim1), !is.na(dw_nominate_dim2),
+               !is.na(cluster), cluster != "") %>%
+        mutate(nominate_dim1  = dw_nominate_dim1,
+               nominate_dim2  = dw_nominate_dim2,
+               cluster_label  = cluster)
     } else {
-      # Use the predefined colors
-      group_colors <- c("Moderate Republicans" = "#fc8d62", 
-                        "Compromise Conservatives" = "#66c2a5",
-                        "Old Guard Republicans" = "#8da0cb", 
-                        "Far-Right Establishment" = "#e78ac3",
-                        "Far-Right Obstructionists" = "#a6d854",
-                        "Progressive Democrats" = "#ffd92f",
-                        "Core Democrats" = "#e5c494",
-                        "Moderate Democrats" = "#b3b3b3",
-                        "Freedom Caucus" = "#d53e4f",
-                        "Group 1" = "#1f77b4", "Group 2" = "#ff7f0e", "Group 3" = "#2ca02c",
-                        "Group 4" = "#d62728", "Group 5" = "#9467bd", "Group 6" = "#8c564b", 
-                        "Group 7" = "#e377c2", "Group 8" = "#7f7f7f", "Group 9" = "#bcbd22", 
-                        "Group 10" = "#17becf")
-      
+      set.seed(123)
+      cluster_data <- five_thirty %>%
+        filter(!is.na(dw_nominate_dim1), !is.na(dw_nominate_dim2)) %>%
+        mutate(nominate_dim1 = dw_nominate_dim1,
+               nominate_dim2 = dw_nominate_dim2)
+      km <- kmeans(cluster_data[, c("nominate_dim1", "nominate_dim2")],
+                   centers = input$clusters, nstart = 25)
+      generic_labels <- paste("Group", 1:input$clusters)
+      cluster_data$cluster_label <- factor(km$cluster,
+                                           levels = 1:input$clusters,
+                                           labels = generic_labels)
+    }
+
+    # ── Colour palette ─────────────────────────────────────────────────────────
+    group_colors <- c("Moderate Republicans"     = "#fc8d62",
+                      "Compromise Conservatives" = "#66c2a5",
+                      "Old Guard Republicans"    = "#8da0cb",
+                      "Far-Right Establishment"  = "#e78ac3",
+                      "Far-Right Obstructionists"= "#a6d854",
+                      "Progressive Democrats"    = "#ffd92f",
+                      "Core Democrats"           = "#e5c494",
+                      "Moderate Democrats"       = "#b3b3b3",
+                      "Freedom Caucus"           = "#d53e4f",
+                      "Group 1"  = "#1f77b4", "Group 2"  = "#ff7f0e",
+                      "Group 3"  = "#2ca02c", "Group 4"  = "#d62728",
+                      "Group 5"  = "#9467bd", "Group 6"  = "#8c564b",
+                      "Group 7"  = "#e377c2", "Group 8"  = "#7f7f7f",
+                      "Group 9"  = "#bcbd22", "Group 10" = "#17becf")
+
+    # ── Plot ───────────────────────────────────────────────────────────────────
+    if (input$use_party_colors) {
+      # Colour by actual party affiliation (D = blue, R = red)
+      ggplot(cluster_data, aes(x = nominate_dim1, y = nominate_dim2, color = party)) +
+        geom_point(size = 4) +
+        scale_color_manual(values = c("D" = "#2166ac", "R" = "#d6604d"),
+                           labels = c("D" = "Democrat", "R" = "Republican")) +
+        labs(title = paste("Congressional Votes —", input$clusters, "Groups"),
+             x = "Nominate Dimension 1 (Liberal vs. Conservative)",
+             y = "Nominate Dimension 2 (Establishment vs. Anti-Establishment)",
+             color = "Party") +
+        theme_minimal() +
+        theme(legend.position = "bottom",
+              legend.title = element_text(size = 12),
+              legend.text  = element_text(size = 10))
+    } else {
       ggplot(cluster_data, aes(x = nominate_dim1, y = nominate_dim2, color = cluster_label)) +
         geom_point(size = 4) +
-        scale_color_manual(values = group_colors) +  # Custom colors for groups
-        labs(title = paste("Clustering with", input$clusters, "Groups"),
-             x = "Nominate Dimension 1 (Liberal vs. Conservative)", 
-             y = "Nominate Dimension 2 (Establishment vs. Anti-Establishment)", 
-             color = "Group") +  # Legend will be based on the cluster labels
+        scale_color_manual(values = group_colors) +
+        labs(title = paste("Congressional Votes —", input$clusters, "Groups"),
+             x = "Nominate Dimension 1 (Liberal vs. Conservative)",
+             y = "Nominate Dimension 2 (Establishment vs. Anti-Establishment)",
+             color = "Group") +
         theme_minimal() +
-        theme(legend.position = "bottom", legend.title = element_text(size = 12), legend.text = element_text(size = 8))
+        theme(legend.position = "bottom",
+              legend.title = element_text(size = 12),
+              legend.text  = element_text(size = 8))
     }
   }) %>% bindCache(input$clusters, input$use_party_colors)
 
@@ -2645,92 +2644,61 @@ shinyServer(function(input, output, session) {
 
 
   output$clusterPie <- renderPlot({
-    set.seed(123)  # Set the random seed for reproducibility
-    
-    
-    # Perform k-means clustering based on user-selected number of clusters
-    cluster_data <- five_thirty %>%
-      select(dw_nominate_dim1, dw_nominate_dim2, party) %>%
-      na.omit()
-    
-    #rename dw_nominate_dim1 and dw_nominate_dim2 to "nominate_dim1" and "nominate_dim2"
-    colnames(cluster_data) <- c("nominate_dim1", "nominate_dim2", "party")
-    
-    km <- kmeans(cluster_data[, c("nominate_dim1", "nominate_dim2")], centers = input$clusters, nstart = 25)
-    
-    # Add cluster assignments to the data
-    cluster_data$cluster <- as.factor(km$cluster)
-    
-    # Post-hoc labeling for clusters based on the selected number of clusters
-    if (input$clusters <= 10) {
-      cluster_labels <- switch(as.character(input$clusters),
-                               "2" = c("Group 1", "Group 2"),
-                               "3" = c("Group 1", "Group 2", "Group 3"),
-                               "4" = c("Group 1", "Group 2", "Group 3", "Group 4"),
-                               "5" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Progressive Democrats", "Core Democrats"),
-                               "6" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Progressive Democrats", "Core Democrats", "Moderate Democrats"),
-                               "7" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Progressive Democrats", "Core Democrats", "Moderate Democrats", "Far-Right Establishment"),
-                               "8" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Far-Right Establishment", "Far-Right Obstructionists", "Progressive Democrats", "Core Democrats", "Moderate Democrats"),
-                               "9" = c("Moderate Republicans", "Compromise Conservatives", "Old Guard Republicans", "Far-Right Establishment", "Far-Right Obstructionists", "Progressive Democrats", "Core Democrats", "Moderate Democrats", "Freedom Caucus"),
-                               "10" = c("Group 1", "Group 2", "Group 3", "Group 4", "Group 5", "Group 6", "Group 7", "Group 8", "Group 9", "Group 10"))
+    # ── Data preparation (same logic as clusterPlot_538) ──────────────────────
+    if (input$clusters == 8) {
+      cluster_data <- five_thirty %>%
+        filter(!is.na(dw_nominate_dim1), !is.na(dw_nominate_dim2),
+               !is.na(cluster), cluster != "") %>%
+        mutate(cluster_label = cluster)
     } else {
-      # Generate generic labels if input$clusters > 10
-      cluster_labels <- paste("Group", 1:input$clusters)
+      set.seed(123)
+      cluster_data <- five_thirty %>%
+        filter(!is.na(dw_nominate_dim1), !is.na(dw_nominate_dim2))
+      km <- kmeans(cluster_data[, c("dw_nominate_dim1", "dw_nominate_dim2")],
+                   centers = input$clusters, nstart = 25)
+      generic_labels <- paste("Group", 1:input$clusters)
+      cluster_data$cluster_label <- factor(km$cluster,
+                                           levels = 1:input$clusters,
+                                           labels = generic_labels)
     }
-    
-    # Ensure the cluster labels are assigned correctly
-    cluster_data$cluster_label <- factor(cluster_data$cluster, 
-                                         levels = 1:input$clusters, 
-                                         labels = cluster_labels)
-    
-    # Summarize the number of members in each cluster
+
+    # Summarize party composition per cluster
     cluster_summary <- cluster_data %>%
-      group_by(cluster_label, party) %>%  # Group by cluster and party
-      summarise(Members = n())  # Summarize the count of members
-    
-    # Check if the user wants to use party colors (Red/Blue)
+      group_by(cluster_label, party) %>%
+      summarise(Members = n(), .groups = "drop")
+
+    # ── Plot ───────────────────────────────────────────────────────────────────
     if (input$use_party_colors) {
-      # Party color scheme (Red for Republican, Blue for Democrat)
-      party_colors <- c("D" = "blue", "R" = "red")
-      
-      # Create the pie chart based on party affiliation with custom line color
       ggplot(cluster_summary, aes(x = "", y = Members, fill = party)) +
-        geom_bar(stat = "identity", width = 1, color = "black") +  # Add line color
+        geom_bar(stat = "identity", width = 1, color = "black") +
         coord_polar("y") +
-        labs(title = "Cluster Proportions by Party") +
+        labs(title = "Cluster Proportions by Party",
+             fill = "Party") +
+        scale_fill_manual(values = c("D" = "#2166ac", "R" = "#d6604d"),
+                          labels = c("D" = "Democrat", "R" = "Republican")) +
         theme_minimal() +
-        scale_fill_manual(values = party_colors) +
         theme(legend.position = "bottom")
-      
     } else {
-      # Map colors to different groups for visualization (standard cluster colors)
-      group_colors <- c("Moderate Republicans" = "#fc8d62", 
+      group_colors <- c("Moderate Republicans"     = "#fc8d62",
                         "Compromise Conservatives" = "#66c2a5",
-                        "Old Guard Republicans" = "#8da0cb", 
-                        "Far-Right Establishment" = "#e78ac3",
-                        "Far-Right Obstructionists" = "#a6d854",
-                        "Progressive Democrats" = "#ffd92f",
-                        "Core Democrats" = "#e5c494",
-                        "Moderate Democrats" = "#b3b3b3",
-                        "Freedom Caucus" = "#d53e4f",
-                        "Group 1" = "#1f77b4", "Group 2" = "#ff7f0e", "Group 3" = "#2ca02c",
-                        "Group 4" = "#d62728", "Group 5" = "#9467bd", "Group 6" = "#8c564b", 
-                        "Group 7" = "#e377c2", "Group 8" = "#7f7f7f", "Group 9" = "#bcbd22", 
-                        "Group 10" = "#17becf")
-      
-      # Handle additional groups if the number of clusters is more than 10
-      if (input$clusters > 10) {
-        additional_colors <- colorRampPalette(c("darkred", "darkblue"))(input$clusters - 10)
-        group_colors <- c(group_colors, setNames(additional_colors, paste("Group", 11:input$clusters)))
-      }
-      
-      # Create the pie chart based on cluster labels
+                        "Old Guard Republicans"    = "#8da0cb",
+                        "Far-Right Establishment"  = "#e78ac3",
+                        "Far-Right Obstructionists"= "#a6d854",
+                        "Progressive Democrats"    = "#ffd92f",
+                        "Core Democrats"           = "#e5c494",
+                        "Moderate Democrats"       = "#b3b3b3",
+                        "Freedom Caucus"           = "#d53e4f",
+                        "Group 1"  = "#1f77b4", "Group 2"  = "#ff7f0e",
+                        "Group 3"  = "#2ca02c", "Group 4"  = "#d62728",
+                        "Group 5"  = "#9467bd", "Group 6"  = "#8c564b",
+                        "Group 7"  = "#e377c2", "Group 8"  = "#7f7f7f",
+                        "Group 9"  = "#bcbd22", "Group 10" = "#17becf")
       ggplot(cluster_summary, aes(x = "", y = Members, fill = cluster_label)) +
         geom_bar(stat = "identity", width = 1) +
         coord_polar("y") +
         labs(title = "Cluster Proportions by Cluster") +
-        theme_minimal() +
         scale_fill_manual(values = group_colors) +
+        theme_minimal() +
         theme(legend.position = "none")
     }
   }) %>% bindCache(input$clusters, input$use_party_colors)
@@ -3248,6 +3216,23 @@ shinyServer(function(input, output, session) {
   observeEvent(input$selectedP, {
     req(input$selectedP)
     clusteringCompleted(FALSE)
+
+    # Reset all per-parliament derived state so that Step 3 exploration
+    # (parliament hemicycle, boxplot, scatter plots) always uses the newly
+    # selected parliament's raw data and correct EPG color mappings.
+    # Without this reset, transformedData from a previous parliament (e.g. P9
+    # with short EPG names) would be returned by explo_data() for the new
+    # parliament (e.g. P6 with long EPG names), causing all EPG colors to
+    # fall through to grey because no key matches.
+    datasets$transformedData  <- NULL
+    datasets$mergedData       <- NULL
+    datasets$cleanedData      <- NULL
+    datasets$engineeredData   <- NULL
+    datasets$umap_data        <- NULL
+    datasets$mca_data         <- NULL
+    datasets$dwnom_data       <- NULL
+    engineered_features(c())
+
     do_load_best(input$selectedP)
   }, ignoreNULL = TRUE, ignoreInit = FALSE)
 
@@ -3296,11 +3281,7 @@ shinyServer(function(input, output, session) {
           column(
             width = 8,
             style = "text-align:center; margin-top: 20px;",
-            tags$img(src = "DALLE.webp", width = "100%", height = "auto", style = "border:1px solid #e2e2e2;"),
-            tags$p(
-              "Image generated with DALL·E (AI).", 
-              style = "font-size: 12px; color: #666; margin-top: 5px;"
-            ),  # Bildnachweis hinzugefügt
+            tags$img(src = "firefly.png", width = "100%", height = "auto", style = "border:1px solid #e2e2e2;"),
             h1(uiOutput("dynamicTitle"), style = "margin-top: 20px;"),
             p(
               paste("PUBLISHED", format(Sys.time(), "%B %d, %Y, at %I:%M %p")),
