@@ -4,7 +4,9 @@
 
 Shiny app for exploring voting behavior in the European Parliament, written as part of a master's thesis on political group cohesion. It covers four legislative terms — EP6 through EP9 (2004–2024) — and walks through the full analysis pipeline: descriptive stats, feature engineering, dimensionality reduction (DW-NOMINATE, MCA, UMAP), and clustering (k-Means, HDBSCAN). Recommended clustering results load automatically on startup, so you can go straight to the exploration without clicking through everything first.
 
-Live version: https://john-f-bruene.shinyapps.io/masterthesis/
+Live version: https://masterthesis-eustat.fly.dev
+
+Also available on shinyapps.io: https://john-f-bruene.shinyapps.io/parliamentlab/
 
 ---
 
