@@ -26,6 +26,10 @@ epg_colors <- c(
 shinyUI(fluidPage(
   theme = shinytheme("lumen"),  # Apply the Lumen theme
 
+  tags$head(
+    tags$link(rel = "icon", type = "image/svg+xml", href = "favicon.svg")
+  ),
+
   useShinyjs(),  # Enable shinyjs for interactivity
 
   tags$style(HTML("
