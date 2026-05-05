@@ -2934,40 +2934,31 @@ shinyServer(function(input, output, session) {
 
 
 
-  # Initialize filter sliders as soon as data is available (Step 2 or raw fallback)
+  # Sync filter controls whenever the active dataset changes (parliament switch or
+  # Step-2 completion). Uses update*Input — inputs are NEVER destroyed/recreated,
+  # so input$ageRange etc. are never transiently NULL and filteredData() never
+  # blocks mid-switch (fixes visible freeze on slow servers like fly.io).
   observe({
     data <- explo_data()
     req(data)
 
-    # Age Slider
-    output$ageSliderUI <- renderUI({
-      sliderInput("ageRange", "Age Range:",
-                  min = min(data$Age, na.rm = TRUE),
-                  max = max(data$Age, na.rm = TRUE),
-                  value = c(min(data$Age, na.rm = TRUE), max(data$Age, na.rm = TRUE)))
-    })
-    
-    # Activity Index Slider
-    output$activitySliderUI <- renderUI({
-      sliderInput("activityRange", "Activity Index:",
-                  min = min(data$Activity_Index, na.rm = TRUE),
-                  max = max(data$Activity_Index, na.rm = TRUE),
-                  value = c(min(data$Activity_Index, na.rm = TRUE), max(data$Activity_Index, na.rm = TRUE)))
-    })
-    
-    # Gender Checkbox Group
-    output$genderCheckboxUI <- renderUI({
-      checkboxGroupInput("gender", "Gender:",
-                         choices = c("M", "F"),
-                         selected = c("M", "F"))
-    })
-    
-    # Country Select Input
-    output$countrySelectUI <- renderUI({
-      selectInput("country", "Country:",
-                  choices = c("All", sort(unique(data$Country))),
-                  selected = "All")
-    })
+    age_min <- min(data$Age, na.rm = TRUE)
+    age_max <- max(data$Age, na.rm = TRUE)
+    act_min <- min(data$Activity_Index, na.rm = TRUE)
+    act_max <- max(data$Activity_Index, na.rm = TRUE)
+
+    updateSliderInput(session, "ageRange",
+                      min = age_min, max = age_max,
+                      value = c(age_min, age_max))
+    updateSliderInput(session, "activityRange",
+                      min = act_min, max = act_max,
+                      value = c(act_min, act_max))
+    updateCheckboxGroupInput(session, "gender",
+                             choices = c("M", "F"),
+                             selected = c("M", "F"))
+    updateSelectInput(session, "country",
+                      choices = c("All", sort(unique(data$Country))),
+                      selected = "All")
   })
   
   # Reset filters
@@ -3299,7 +3290,7 @@ shinyServer(function(input, output, session) {
           column(
             width = 8,
             style = "text-align:center; margin-top: 20px;",
-            tags$img(src = "firefly.png", width = "100%", height = "auto", style = "border:1px solid #e2e2e2;"),
+            tags$img(src = "Firefly.png", width = "100%", height = "auto", style = "border:1px solid #e2e2e2;"),
             h1(uiOutput("dynamicTitle"), style = "margin-top: 20px;"),
             p(
               paste("PUBLISHED", format(Sys.time(), "%B %d, %Y, at %I:%M %p")),
