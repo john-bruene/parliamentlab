@@ -15,7 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev \
     libxml2-dev \
     cmake \
-    libabsl-dev && \
+    libabsl-dev \
+    libharfbuzz-dev \
+    libfribidi-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Installiere die R-Pakete, die in der App via library() geladen werden.
@@ -27,8 +29,7 @@ RUN R -e "options(Ncpus = 4); \
   pkgs <- c('shiny','shinythemes','DT','ggplot2','dplyr','tidyr','scales','gridExtra', \
             'sortable','plotly','shinyBS','shinyjs','reactable', \
             'clusterCrit','umap','dbscan','FactoMineR', \
-            'packcircles','ggiraph','sf','sparkline','bslib','shinycssloaders', \
-            'qs','profvis','shinyloadtest'); \
+            'packcircles','ggiraph','sf','sparkline','bslib','shinycssloaders'); \
   install.packages(pkgs, repos = 'http://cran.rstudio.com/'); \
   missing <- setdiff(pkgs, rownames(installed.packages())); \
   if (length(missing) > 0) stop('install.packages failed for: ', paste(missing, collapse = ', '))"
