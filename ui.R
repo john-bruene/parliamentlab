@@ -29,25 +29,10 @@ shinyUI(fluidPage(
   useShinyjs(),  # Enable shinyjs for interactivity
 
   tags$style(HTML("
-    /* ── Global typography ─────────────────────────────────────── */
-    body, .shiny-app {
-      font-family: 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif;
-      font-size: 14px;
-      color: #333;
-    }
-
-    /* Heading scale — h3 is a section header, h4 a subsection, h5 a label */
-    h3, .h3 { font-size: 20px; font-weight: 600; margin-top: 18px; margin-bottom: 10px; }
-    h4, .h4 { font-size: 16px; font-weight: 600; margin-top: 14px; margin-bottom: 8px;  }
-    h5, .h5 { font-size: 14px; font-weight: 600; margin-top: 10px; margin-bottom: 6px;  }
-
-    /* Paragraph text */
-    p { font-size: 14px; line-height: 1.6; }
-
-    /* ── Highlight effect ──────────────────────────────────────── */
+    /* Highlight effect */
     .highlight { background-color: #d4f7d4 !important; border-radius: 10px; padding: 5px; }
 
-    /* ── Clean plot panel ──────────────────────────────────────── */
+    /* Clean plot panel — replaces lightyellow containers */
     .plot-panel {
       background: #fff;
       border: 1px solid #e0e0e0;
@@ -56,7 +41,7 @@ shinyUI(fluidPage(
       box-shadow: 0 1px 4px rgba(0,0,0,.07);
     }
 
-    /* ── Info callout boxes ────────────────────────────────────── */
+    /* Info callout boxes (replaces lightyellow text blocks) */
     .info-callout {
       border-left: 4px solid #5b9bd5;
       background: #f0f6ff;
@@ -66,11 +51,8 @@ shinyUI(fluidPage(
       color: #222;
     }
 
-    /* ── Spinner colour tweak ──────────────────────────────────── */
+    /* Spinner colour tweak */
     .shiny-spinner-output-container { min-height: 60px; }
-
-    /* ── Sidebar inputs: tighten label weight ─────────────────── */
-    .control-label { font-weight: 600; font-size: 13px; color: #444; }
   ")),
                   
 
