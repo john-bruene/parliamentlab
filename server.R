@@ -3084,37 +3084,55 @@ shinyServer(function(input, output, session) {
     
     if (!is.null(click_data)) {
       clicked_name <- click_data$key
-      
-      
+
       if (clicked_name %in% data$Name) {
         # Find the politician's details in the dataset
         politician_info <- data %>% filter(Name == clicked_name)
-        
+
         # Lookup the ISO code using the country name
         country_code <- country_code_map[politician_info$Country]
-        
+
         # Construct the relative path to the flag image
-        flag_path <- if (!is.na(country_code)) {
+        flag_path <- if (!is.na(country_code) && !is.null(country_code)) {
           paste0("flags/", country_code, ".png")
         } else {
           NULL
         }
-        
-        # Debugging log for flag path
-        cat("Flag Path:", flag_path, "\n")
-        
+
+        # Fetch MEP photo server-side and serve as base64 data URI so it works
+        # in RStudio's WebView, which blocks direct external image URLs.
+        photo_src <- tryCatch({
+          photo_url <- if ("Photo" %in% colnames(politician_info) &&
+                           !is.na(politician_info$Photo) &&
+                           nzchar(trimws(as.character(politician_info$Photo)))) {
+            trimws(as.character(politician_info$Photo))
+          } else NA_character_
+          if (is.na(photo_url) || !startsWith(photo_url, "http")) stop("no URL")
+          tmp <- tempfile(fileext = ".jpg")
+          dl_status <- download.file(photo_url, tmp, quiet = TRUE, mode = "wb")
+          if (dl_status != 0 || !file.exists(tmp) || file.info(tmp)$size < 100L) {
+            stop("download failed")
+          }
+          img_bytes <- readBin(tmp, "raw", n = file.info(tmp)$size)
+          unlink(tmp)
+          paste0("data:image/jpeg;base64,", jsonlite::base64_enc(img_bytes))
+        }, error = function(e) "placeholder-image.png")
+
         # Render the politician details in the sidebar
         output$politicianDetails <- renderUI({
           tagList(
             tags$h4(politician_info$Name),
-            tags$img(src = politician_info$Photo, width = "60%", height = "auto"),  # Politician's photo
-            tags$p(
-              strong("EPG:"), politician_info$EPG
+            tags$img(
+              src     = photo_src,
+              width   = "60%",
+              height  = "auto",
+              onerror = "this.onerror=null;this.src='placeholder-image.png';"
             ),
+            tags$p(strong("EPG:"), politician_info$EPG),
             tags$p(
               strong("Country:"),
               if (!is.null(flag_path)) {
-                tags$img(src = flag_path, width = "20px", height = "15px")  # Render flag
+                tags$img(src = flag_path, width = "20px", height = "15px")
               } else {
                 "(Flag not available)"
               },
