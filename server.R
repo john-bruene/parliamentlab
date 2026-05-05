@@ -118,6 +118,24 @@ shinyServer(function(input, output, session) {
   clusterPlotObject <- reactiveVal(NULL)
   finalClusterPlotObject <- reactiveVal(NULL)
 
+  # Single persistent render — shows placeholder until first clustering run.
+  # Defined here so it is never NULL-spinning; button handlers only need to
+  # call clusterPlotObject(plot) and this render picks up the change.
+  output$clusterPlot <- renderPlot({
+    obj <- clusterPlotObject()
+    if (is.null(obj)) {
+      ggplot() +
+        annotate("text", x = 0.5, y = 0.5,
+                 label = "Select a clustering method on the left\nand press Run",
+                 size = 5.5, color = "grey55", hjust = 0.5, vjust = 0.5,
+                 lineheight = 1.4) +
+        theme_void()
+    } else {
+      obj
+    }
+  })
+
+
   
   
   generateClusterPlot <- function(data, clustering_columns, method_name, num_clusters) {
@@ -1321,8 +1339,8 @@ shinyServer(function(input, output, session) {
       coord_sf(xlim = c(-10, 35), ylim = c(35, 70), expand = FALSE) +  # Zoom auf Europa
       theme_void() +
       theme(
-        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
-        plot.subtitle = element_text(size = 15, hjust = 0.5),
+        plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(size = 13, hjust = 0.5),
         plot.caption = element_text(size = 10, hjust = 0),
         legend.position = "right",
         legend.title = element_text(size = 12),
@@ -2200,16 +2218,9 @@ shinyServer(function(input, output, session) {
       output$elbowPlotK <- NULL  # Elbow plot not applicable for higher dimensions
     }
     
-    # Cluster-Plot generieren und speichern
     cluster_plot <- generateClusterPlot(data, clustering_columns, "K-Means", input$kmeans_k)
     clusterPlotObject(cluster_plot)
-    
-    # Cluster-Plot rendern
-    output$clusterPlot <- renderPlot({
-      clusterPlotObject()
-    })
-    
-    
+
   })
   
   
@@ -2288,14 +2299,8 @@ shinyServer(function(input, output, session) {
       output$elbowPlotPAM <- NULL  # Elbow plot not applicable for higher dimensions
     }
     
-    # Cluster-Plot generieren und speichern
     cluster_plot <- generateClusterPlot(data, clustering_columns, "PAM", input$pam_k)
     clusterPlotObject(cluster_plot)
-    
-    # Cluster-Plot rendern
-    output$clusterPlot <- renderPlot({
-      clusterPlotObject()
-    })
 
 
   })
@@ -2353,11 +2358,6 @@ shinyServer(function(input, output, session) {
 
     cluster_plot <- generateClusterPlot(data, clustering_columns, "HDBSCAN", input$hdbscan_minPts)
     clusterPlotObject(cluster_plot)
-    
-    # Cluster-Plot rendern
-    output$clusterPlot <- renderPlot({
-      clusterPlotObject()
-    })
     
   })
   
@@ -2866,15 +2866,25 @@ shinyServer(function(input, output, session) {
       return(trace)
     })
     
-    # Adjust the legend layout
+    # Adjust the legend layout; lock axes so no zoom/pan (hover still works)
     interactive_parliament_plot <- interactive_parliament_plot %>%
       layout(
         legend = list(orientation = "h",   # Move the legend to the bottom
                       x = 0.5,             # Center the legend horizontally
                       y = -0.1,            # Move the legend slightly below the plot
                       xanchor = "center",  # Horizontal anchor
-                      yanchor = "top")     # Vertical anchor
-      ) %>% event_register("plotly_click")
+                      yanchor = "top"),    # Vertical anchor
+        xaxis = list(fixedrange = TRUE),
+        yaxis = list(fixedrange = TRUE)
+      ) %>%
+      config(
+        displayModeBar        = TRUE,
+        modeBarButtonsToRemove = c("zoom2d", "pan2d", "select2d", "lasso2d",
+                                   "zoomIn2d", "zoomOut2d", "autoScale2d",
+                                   "resetScale2d"),
+        scrollZoom = FALSE
+      ) %>%
+      event_register("plotly_click")
     
     return(interactive_parliament_plot)
   }
@@ -3225,6 +3235,7 @@ shinyServer(function(input, output, session) {
   observeEvent(input$selectedP, {
     req(input$selectedP)
     clusteringCompleted(FALSE)
+    clusterPlotObject(NULL)   # reset Step-4 plot when parliament switches
 
     # Reset all per-parliament derived state so that Step 3 exploration
     # (parliament hemicycle, boxplot, scatter plots) always uses the newly
@@ -3727,9 +3738,9 @@ shinyServer(function(input, output, session) {
       labs(title = "Political Left-Right-Distribution") +
       theme_minimal() +
       theme(
-        plot.title = element_text(size = 18, face = "bold"),
-        plot.subtitle = element_text(size = 14),
-        axis.title = element_text(size = 14)
+        plot.title = element_text(size = 16, face = "bold"),
+        plot.subtitle = element_text(size = 13),
+        axis.title = element_text(size = 12)
       )
   })
   
@@ -3971,6 +3982,13 @@ shinyServer(function(input, output, session) {
         ),
         showlegend = TRUE,
         legend = list(title = list(text = "Cluster"), orientation = "h", x = 0.5, xanchor = "center", y = -0.2)
+      ) %>%
+      config(
+        displayModeBar        = TRUE,
+        modeBarButtonsToRemove = c("zoom2d", "pan2d", "select2d", "lasso2d",
+                                   "zoomIn2d", "zoomOut2d", "autoScale2d",
+                                   "resetScale2d"),
+        scrollZoom = FALSE
       )
   })
   
