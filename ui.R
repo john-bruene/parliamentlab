@@ -992,7 +992,7 @@ shinyUI(fluidPage(
                                        tags$div(
                                          style = "background:#e8f4e8; border-radius:6px; padding:8px 12px; margin-bottom:10px;",
                                          tags$b("Active legislature: "),
-                                         textOutput("selected_period_label", inline = TRUE),
+                                         textOutput("selected_period_label2", inline = TRUE),
                                          tags$span(style="color:#666; font-size:12px; display:block; margin-top:3px;",
                                                    "Change using the bar above the navigation tabs.")
                                        ),
@@ -1106,6 +1106,14 @@ shinyUI(fluidPage(
                                          )
                                        ),
                                        
+                                       # Mapping selection radio — only one can be active at a time
+                                       radioButtons("select_mapping", "Select mapping for clustering:",
+                                                    choices = c("None" = "none",
+                                                                "DW-NOMINATE" = "dwnom",
+                                                                "MCA" = "mca",
+                                                                "UMAP" = "umap"),
+                                                    selected = "none", inline = TRUE),
+
                                        # DW-NOMINATE Plot Section
                                        fluidRow(
                                          class = "dwnom_plot_row",  # Add the class for highlighting
@@ -1115,12 +1123,11 @@ shinyUI(fluidPage(
                                          ),
                                          column(
                                            width = 2,
-                                           checkboxInput("select_dwnom", label = NULL, value = FALSE, width = "100%"),
                                            uiOutput("icon_dwnom")  # Placeholder for icon
                                          ), style = "border:1px solid black"
                                        ),
                                        hr(),
-                                       
+
                                        # MCA Plot Section
                                        fluidRow(
                                          class = "mca_plot_row",  # Add the class for highlighting
@@ -1130,12 +1137,11 @@ shinyUI(fluidPage(
                                          ),
                                          column(
                                            width = 2,
-                                           checkboxInput("select_mca", label = NULL, value = FALSE, width = "100%"),
                                            uiOutput("icon_mca")  # Placeholder for icon
                                          ), style = "border:1px solid black"
                                        ),
                                        hr(),
-                                       
+
                                        # UMAP Plot Section
                                        fluidRow(
                                          class = "umap_plot_row",  # Add the class for highlighting
@@ -1145,7 +1151,6 @@ shinyUI(fluidPage(
                                          ),
                                          column(
                                            width = 2,
-                                           checkboxInput("select_umap", label = NULL, value = FALSE, width = "100%"),
                                            uiOutput("icon_umap")  # Placeholder for icon
                                          ), style = "border:1px solid black"
                                        ),
@@ -1415,6 +1420,18 @@ shinyUI(fluidPage(
                                                   tags$li(
                                                     "Hix, Simon, Noury, Abdul, and Roland, Gerard. (2005). Dimensions of Politics in the European Parliament. See ",
                                                     tags$a(href = "https://escholarship.org/uc/item/4gb278j5", target = "_blank", "details here.")
+                                                  ),
+                                                  tags$li(
+                                                    "Hix, Simon, Noury, Abdul, and Roland, Gerard. (2006). Dimensions of Politics in the European Parliament. ",
+                                                    tags$em("American Journal of Political Science"),
+                                                    ", 50(2), 494–511. ",
+                                                    tags$a(href = "https://doi.org/10.1111/j.1540-5907.2006.00198.x", target = "_blank", "DOI link.")
+                                                  ),
+                                                  tags$li(
+                                                    "Hix, Simon, and Høyland, Bjørn. (2013). Empowerment of the European Parliament. ",
+                                                    tags$em("Annual Review of Political Science"),
+                                                    ", 16, 171–189. ",
+                                                    tags$a(href = "https://doi.org/10.1146/annurev-polisci-032311-110735", target = "_blank", "DOI link.")
                                                   ),
                                                   tags$li(
                                                     "Parltrack.eu: Biographical Data on Members of the European Parliament. Visit ",
