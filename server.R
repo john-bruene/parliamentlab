@@ -148,7 +148,7 @@ shinyServer(function(input, output, session) {
     }
     
     # Plot erstellen
-    p <- ggplot(data, aes_string(x = clustering_columns[1], y = clustering_columns[2], color = "Cluster")) +
+    p <- ggplot(data, aes(x = .data[[clustering_columns[1]]], y = .data[[clustering_columns[2]]], color = Cluster)) +
       geom_point() +
       labs(title = plot_title) +
       theme_minimal() +
@@ -272,7 +272,7 @@ shinyServer(function(input, output, session) {
       "P7" = c(
         "Group of the Alliance of Liberals and Democrats for Europe" = "gold",
         "Group of the European People's Party (Christian Democrats)" = "blue",
-        "Europe of freedom and democracy Group" = "lightblue",
+        "Europe of Freedom and Democracy Group" = "lightblue",
         "Non-attached Members" = "grey", 
         "Group of the Greens/European Free Alliance" = "green",
         "European Conservatives and Reformists Group" = "darkblue",
@@ -625,8 +625,8 @@ shinyServer(function(input, output, session) {
           h5(strong("Winning Score Formula:")),
           p("The winning score measures how often a politician votes with the winning side."),
           withMathJax(p("$$ Winning~Score = \\frac{Votes~with~Winning~Majority}{Total~Votes} $$")),
-          checkboxInput("check_final_votes", "Only consider final votes", value = TRUE),
-          checkboxInput("check_absent", "Ignore absent votes", value = TRUE)
+          checkboxInput("check_final_votes_win", "Only consider final votes", value = TRUE),
+          checkboxInput("check_absent_win", "Ignore absent votes", value = TRUE)
         ),
         
         "Age" = div(
@@ -1297,9 +1297,9 @@ shinyServer(function(input, output, session) {
       Country = c("Germany", "Portugal", "Luxembourg", "United Kingdom", "France", "Italy", "Netherlands",
                   "Denmark", "Ireland", "Spain", "Belgium", "Austria", "Finland", "Sweden", "Greece",
                   "Cyprus", "Lithuania", "Poland", "Hungary", "Latvia", "Estonia", "Slovakia", "Malta",
-                  "Slovenia", "Czech Republic", "Romania", "Bulgaria"),
+                  "Slovenia", "Czech Republic", "Romania", "Bulgaria", "Croatia"),
       geo = c("DE", "PT", "LU", "UK", "FR", "IT", "NL", "DK", "IE", "ES", "BE", "AT", "FI", "SE",
-              "GR", "CY", "LT", "PL", "HU", "LV", "EE", "SK", "MT", "SI", "CZ", "RO", "BG")
+              "GR", "CY", "LT", "PL", "HU", "LV", "EE", "SK", "MT", "SI", "CZ", "RO", "BG", "HR")
     )
     
     # Zuordnung der EU28-Länder, inklusive UK
@@ -1591,7 +1591,7 @@ shinyServer(function(input, output, session) {
       MCA_y <- if (input$use_final_votes_only) "MCA2_red" else "MCA2"
       
       # Render MCA plot
-      p <- ggplot(mca_data, aes_string(x = MCA_x, y = MCA_y, color = "EPG")) +
+      p <- ggplot(mca_data, aes(x = .data[[MCA_x]], y = .data[[MCA_y]], color = EPG)) +
         geom_point() +
         labs(title = "Multiple Correspondence Analysis (MCA) Plot", x = MCA_x, y = MCA_y) +
         scale_color_manual(values = party_colors) +
@@ -1798,7 +1798,7 @@ shinyServer(function(input, output, session) {
       
       
       # Visualization
-      ggplot(umap_data, aes_string(x = UMAP_x, y = UMAP_y, color = "EPG")) +
+      ggplot(umap_data, aes(x = .data[[UMAP_x]], y = .data[[UMAP_y]], color = EPG)) +
         geom_point() +
         labs(title = "UMAP mit Gower-Distanz", x = UMAP_x, y = UMAP_y) +
         theme_minimal() +
@@ -2013,135 +2013,112 @@ shinyServer(function(input, output, session) {
 
   
   ###########################
-  
+
   selected_mapping <- reactiveVal(NULL)
-  
-  # Define color and icon output based on checkbox selection
-  observeEvent(input$select_dwnom, {
-    if (input$select_dwnom) {
+
+  # Single observer for the mapping radio — replaces three checkbox observers
+  observeEvent(input$select_mapping, {
+    sel <- input$select_mapping
+
+    # Clear all highlights and icons first
+    shinyjs::removeClass(selector = ".dwnom_plot_row", class = "highlight")
+    shinyjs::removeClass(selector = ".mca_plot_row",   class = "highlight")
+    shinyjs::removeClass(selector = ".umap_plot_row",  class = "highlight")
+    output$icon_dwnom <- renderUI({ NULL })
+    output$icon_mca   <- renderUI({ NULL })
+    output$icon_umap  <- renderUI({ NULL })
+
+    if (sel == "dwnom") {
       output$icon_dwnom <- renderUI({ icon("crown", style = "color: gold; font-size: 3em;") })
       shinyjs::addClass(selector = ".dwnom_plot_row", class = "highlight")
       selected_mapping("DW-NOMINATE")
-      
+
       output$finalClusterPlot <- renderPlot({
         settings <- get_party_settings()
         party_colors <- settings$party_colors
         data <- data_react()
-        
-        # Use reduced columns if the option is enabled
+
         col_x <- if (input$use_final_votes_only) "coord2D_red" else "coord1D"
         col_y <- if (input$use_final_votes_only) "coord1D_red" else "coord2D"
-        
-        # Render DW-NOMINATE plot
-        p <- ggplot(data, aes_string(x = col_x, y = col_y, color = "EPG")) +
+
+        p <- ggplot(data, aes(x = .data[[col_x]], y = .data[[col_y]], color = EPG)) +
           geom_point() +
           labs(title = "DW-NOMINATE Plot", x = "DW1", y = "DW2") +
           scale_color_manual(values = party_colors) +
           theme_minimal() +
           theme(
             plot.title = element_text(size = 16, face = "bold"),
-            legend.position = "none"  # Remove legend
+            legend.position = "none"
           )
-        
         finalClusterPlotObject(p)
         p
       })
-      
-    } else {
-      output$icon_dwnom <- renderUI({ NULL })
-      shinyjs::removeClass(selector = ".dwnom_plot_row", class = "highlight")
-    }
-  })
-  
-  observeEvent(input$select_umap, {
-    if (input$select_umap) {
+
+    } else if (sel == "umap") {
       output$icon_umap <- renderUI({ icon("crown", style = "color: gold; font-size: 3em;") })
       shinyjs::addClass(selector = ".umap_plot_row", class = "highlight")
       selected_mapping("UMAP")
-      
+
       output$finalClusterPlot <- renderPlot({
         settings <- get_party_settings()
         party_colors <- settings$party_colors
         data <- get_selected_data()
-        
-        # Use reduced columns if the option is enabled
+
         col_x <- if (input$use_final_votes_only) "UMAP1_red" else "UMAP1"
         col_y <- if (input$use_final_votes_only) "UMAP2_red" else "UMAP2"
-        
-        # Render UMAP plot
-        p <- ggplot(data, aes_string(x = col_x, y = col_y, color = "EPG")) +
+
+        p <- ggplot(data, aes(x = .data[[col_x]], y = .data[[col_y]], color = EPG)) +
           geom_point() +
           labs(title = "UMAP with Gower Distance", x = "UMAP1", y = "UMAP2") +
           scale_color_manual(values = party_colors) +
           theme_minimal() +
           theme(
             plot.title = element_text(size = 16, face = "bold"),
-            legend.position = "none"  # Remove legend
+            legend.position = "none"
           )
-        
         finalClusterPlotObject(p)
         p
       })
-      
-    } else {
-      output$icon_umap <- renderUI({ NULL })
-      shinyjs::removeClass(selector = ".umap_plot_row", class = "highlight")
-    }
-  })
-  
-  observeEvent(input$select_mca, {
-    if (input$select_mca) {
+
+    } else if (sel == "mca") {
       output$icon_mca <- renderUI({ icon("crown", style = "color: gold; font-size: 3em;") })
       shinyjs::addClass(selector = ".mca_plot_row", class = "highlight")
       selected_mapping("MCA")
-      
+
       output$finalClusterPlot <- renderPlot({
         settings <- get_party_settings()
         party_colors <- settings$party_colors
         data <- get_selected_data()
-        
-        # Use reduced columns if the option is enabled
+
         col_x <- if (input$use_final_votes_only) "MCA1_red" else "MCA1"
         col_y <- if (input$use_final_votes_only) "MCA2_red" else "MCA2"
-        
-        # Render MCA plot
-        p <- ggplot(data, aes_string(x = col_x, y = col_y, color = "EPG")) +
+
+        p <- ggplot(data, aes(x = .data[[col_x]], y = .data[[col_y]], color = EPG)) +
           geom_point() +
           labs(title = "Multiple Correspondence Analysis (MCA) Plot", x = "MCA1", y = "MCA2") +
           scale_color_manual(values = party_colors) +
           theme_minimal() +
           theme(
             plot.title = element_text(size = 16, face = "bold"),
-            legend.position = "none"  # Remove legend
+            legend.position = "none"
           )
-        
-          p <- p + coord_cartesian(ylim = c(NA, 1.2))  # Upper bound set, lower bound unrestricted
-        
-          finalClusterPlotObject(p)
-          p
+        p <- p + coord_cartesian(ylim = c(NA, 1.2))
+        finalClusterPlotObject(p)
+        p
       })
+
     } else {
-      output$icon_mca <- renderUI({ NULL })
-      shinyjs::removeClass(selector = ".mca_plot_row", class = "highlight")
+      selected_mapping(NULL)
     }
   })
-  
-  
-  
+
+
+
   ############################
   
   
-  # Filter data by absence threshold
-  filter_mep_by_absence <- function(data, threshold) {
-    data %>%
-      rowwise() %>%
-      mutate(absence_percentage = sum(c_across(starts_with("X")) == 0) / length(c_across(starts_with("X"))) * 100) %>%
-      ungroup() %>%
-      filter(absence_percentage <= threshold) %>%
-      select(-absence_percentage)  # Remove the helper column
-  }
 
-  
+
   get_selected_data <- function() {
     mapping <- selected_mapping()
     req(mapping)  # Make sure mapping is not NULL
@@ -2167,9 +2144,11 @@ shinyServer(function(input, output, session) {
 
   # Observe K-Means button and run clustering
   observeEvent(input$runKMeans, {
-    
-    clusteringCompleted(TRUE)
-    
+    if (is.null(selected_mapping())) {
+      showNotification("Please select a mapping method (DW-NOMINATE, MCA, or UMAP) in the Mapping Methods tab first.", type = "warning", duration = 6)
+      return()
+    }
+
     set.seed(123)
     data <- get_selected_data()
     req(data)
@@ -2218,6 +2197,7 @@ shinyServer(function(input, output, session) {
       output$elbowPlotK <- NULL  # Elbow plot not applicable for higher dimensions
     }
     
+    clusteringCompleted(TRUE)
     cluster_plot <- generateClusterPlot(data, clustering_columns, "K-Means", input$kmeans_k)
     clusterPlotObject(cluster_plot)
 
@@ -2248,9 +2228,11 @@ shinyServer(function(input, output, session) {
 
   # Observe PAM button and run clustering
   observeEvent(input$runPAM, {
-    
-    clusteringCompleted(TRUE)
-    
+    if (is.null(selected_mapping())) {
+      showNotification("Please select a mapping method (DW-NOMINATE, MCA, or UMAP) in the Mapping Methods tab first.", type = "warning", duration = 6)
+      return()
+    }
+
     set.seed(123)
     data <- get_selected_data()
     req(data)
@@ -2299,6 +2281,7 @@ shinyServer(function(input, output, session) {
       output$elbowPlotPAM <- NULL  # Elbow plot not applicable for higher dimensions
     }
     
+    clusteringCompleted(TRUE)
     cluster_plot <- generateClusterPlot(data, clustering_columns, "PAM", input$pam_k)
     clusterPlotObject(cluster_plot)
 
@@ -2310,9 +2293,11 @@ shinyServer(function(input, output, session) {
   
   # Observe HDBSCAN button and run clustering
   observeEvent(input$runHDBSCAN, {
-    
-    clusteringCompleted(TRUE)
-    
+    if (is.null(selected_mapping())) {
+      showNotification("Please select a mapping method (DW-NOMINATE, MCA, or UMAP) in the Mapping Methods tab first.", type = "warning", duration = 6)
+      return()
+    }
+
     set.seed(123)
     data <- get_selected_data()
     req(data)
@@ -2355,10 +2340,10 @@ shinyServer(function(input, output, session) {
     }
     
     # Render cluster plot
-
+    clusteringCompleted(TRUE)
     cluster_plot <- generateClusterPlot(data, clustering_columns, "HDBSCAN", input$hdbscan_minPts)
     clusterPlotObject(cluster_plot)
-    
+
   })
   
   
@@ -2716,45 +2701,43 @@ shinyServer(function(input, output, session) {
     )
   })
   
-  # Assuming you have the k-means model km already computed
-  output$metricResult <- renderText({
-    selected <- input$selectedMetric
-    
-    set.seed(123)  # Set the random seed for reproducibility
-    
-    # Perform k-means clustering based on user-selected number of clusters
+  # Cached k-means + metrics for Step 1 — only re-runs when input$clusters changes
+  cached_538_metrics <- reactive({
+    set.seed(123)
     cluster_data <- five_thirty %>%
       select(dw_nominate_dim1, dw_nominate_dim2) %>%
       na.omit()
-    
-    #rename dw_nominate_dim1 and dw_nominate_dim2 to "nominate_dim1" and "nominate_dim2"
     colnames(cluster_data) <- c("nominate_dim1", "nominate_dim2")
-    
+
     km <- kmeans(cluster_data[, c("nominate_dim1", "nominate_dim2")], centers = input$clusters, nstart = 25)
-    
-    # Calculate WCSS (tot.withinss) and BCSS (betweenss)
+
     wcss <- km$tot.withinss
     bcss <- km$betweenss
     tss <- wcss + bcss
-    
-    # Silhouette score requires both cluster assignments and a distance matrix
+
     dist_matrix <- dist(cluster_data[, c("nominate_dim1", "nominate_dim2")])
     sil_scores <- silhouette(km$cluster, dist_matrix)
-    sil_avg <- mean(sil_scores[, 3])  # Average silhouette score
-    
-    # Calinski-Harabasz and Davies-Bouldin Index
+    sil_avg <- mean(sil_scores[, 3])
+
     crits <- intCriteria(as.matrix(cluster_data[, c("nominate_dim1", "nominate_dim2")]), km$cluster, c("Calinski_Harabasz", "Davies_Bouldin"))
-    calinski_harabasz <- crits$calinski_harabasz
-    davies_bouldin <- crits$davies_bouldin
-    
-    # Switch to select the appropriate metric and display the actual calculated value
+
+    list(wcss = wcss, bcss = bcss, tss = tss,
+         sil_avg = sil_avg,
+         calinski_harabasz = crits$calinski_harabasz,
+         davies_bouldin = crits$davies_bouldin)
+  })
+
+  output$metricResult <- renderText({
+    selected <- input$selectedMetric
+    m <- cached_538_metrics()
+
     switch(selected,
-           "wcss" = paste("WCSS: ", round(wcss, 2)),
-           "bcss" = paste("BCSS: ", round(bcss, 2)),
-           "tss" = paste("TSS: ", round(tss, 2)),
-           "silhouette" = paste("Silhouette Score: ", round(sil_avg, 2)),
-           "ch_index" = paste("Calinski-Harabasz Index: ", round(calinski_harabasz, 2)),
-           "db_index" = paste("Davies-Bouldin Index: ", round(davies_bouldin, 2))
+           "wcss" = paste("WCSS: ", round(m$wcss, 2)),
+           "bcss" = paste("BCSS: ", round(m$bcss, 2)),
+           "tss" = paste("TSS: ", round(m$tss, 2)),
+           "silhouette" = paste("Silhouette Score: ", round(m$sil_avg, 2)),
+           "ch_index" = paste("Calinski-Harabasz Index: ", round(m$calinski_harabasz, 2)),
+           "db_index" = paste("Davies-Bouldin Index: ", round(m$davies_bouldin, 2))
     )
   })
   
@@ -3416,14 +3399,17 @@ shinyServer(function(input, output, session) {
   
   
   # Human-readable label for the global legislature selector display
+  .period_labels <- c(
+    P6 = "6th Parliament (2004–2009)",
+    P7 = "7th Parliament (2009–2014)",
+    P8 = "8th Parliament (2014–2019)",
+    P9 = "9th Parliament (2019–2024)"
+  )
   output$selected_period_label <- renderText({
-    labels <- c(
-      P6 = "6th Parliament (2004–2009)",
-      P7 = "7th Parliament (2009–2014)",
-      P8 = "8th Parliament (2014–2019)",
-      P9 = "9th Parliament (2019–2024)"
-    )
-    labels[input$selectedP %||% "P9"]
+    .period_labels[input$selectedP %||% "P9"]
+  })
+  output$selected_period_label2 <- renderText({
+    .period_labels[input$selectedP %||% "P9"]
   })
 
   output$dynamicTitle <- renderUI({
@@ -3734,7 +3720,7 @@ shinyServer(function(input, output, session) {
       geom_text(data = median_data, aes(x = median_coord2D, y = Cluster, label = round(median_coord2D, 2)), 
                 vjust = -0.5, color = "black") +
       scale_y_discrete(name = "Clusters") +
-      scale_x_continuous(name = "DW-NOMINATE 1nd Dimension (Conservatism-Liberalism)") +
+      scale_x_continuous(name = "DW-NOMINATE 1st Dimension (Conservatism-Liberalism)") +
       labs(title = "Political Left-Right-Distribution") +
       theme_minimal() +
       theme(
