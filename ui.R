@@ -107,7 +107,7 @@ shinyUI(fluidPage(
                                    br(),
                                    p("Welcome to this interactive application, designed to explore and analyze the clustering of voting behaviors within the European Parliament. 
     This tool provides insights into how Members of the European Parliament (MEPs) form latent voting blocs based on their voting patterns. 
-    Using advanced dimensionality reduction techniques like UMAP, MCA, and DW-NOMINATE, as well as clustering methods such as K-Means, PAM, and HDBSCAN, 
+    Using advanced dimensionality reduction techniques like UMAP, MCA, and W-NOMINATE, as well as clustering methods such as K-Means, PAM, and HDBSCAN, 
     this application allows you to investigate the ideological alignments and coalitions that emerge within the EU legislative body.", 
                                      strong("Don't worry if you're new to these techniques!"), "This app provides an intuitive interface to guide you through each step, 
     offering visuals and interpretations to help you understand the complex relationships between MEPs.", 
@@ -196,7 +196,7 @@ shinyUI(fluidPage(
                           div(style = "text-align: center; width: 200px;",
                               icon("project-diagram", "fa-3x", style = "color:#FF69B4;"),
                               tags$h4("Dimensionality Reduction"),
-                              tags$p("Using UMAP, MCA, and DW-NOMINATE, I transformed high-dimensional voting data into a compact format for clustering.")
+                              tags$p("Using UMAP, MCA, and W-NOMINATE, I transformed high-dimensional voting data into a compact format for clustering.")
                           ),
                           
                           div(style = "text-align: center; width: 200px;",
@@ -916,16 +916,16 @@ shinyUI(fluidPage(
                             width = 8,
                             h4("Dimensionality Reduction Techniques", style = "color:black;text-align:center"),
                             
-                            p("In this step, we employ three different dimensionality reduction techniques—UMAP, MCA, and DW-NOMINATE—to progressively reveal patterns in the voting data. 
-       Each method has distinct strengths, and the process moves from a broad representation to a more targeted political spectrum approach. These mappings help us 
+                            p("In this step, we employ three different dimensionality reduction techniques—UMAP, MCA, and W-NOMINATE—to progressively reveal patterns in the voting data. 
+       Each method has distinct strengths, and the process moves from a broad representation to a more targeted political spectrum approach. These dimensionality reduction methods help us
        visualize latent voting patterns within the European Parliament.",
                               style = "color:black;text-align:justify"),
                             
                             br(),
                             
-                            # DW-NOMINATE Section
-                            h4("1. DW-NOMINATE - A Political Spectrum Analysis", style = "color:black"),
-                            p("DW-NOMINATE is a widely used method in political science to map representatives onto a multidimensional ideological spectrum.
+                            # W-NOMINATE Section
+                            h4("1. W-NOMINATE - A Political Spectrum Analysis", style = "color:black"),
+                            p("W-NOMINATE is a widely used method in political science to map representatives onto a multidimensional ideological spectrum.
        It provides a detailed understanding of MEP alignments by placing them within an ideological context based on their voting behavior.
        This approach reveals ideological trends and bloc formations within the Parliament, helping us go beyond general clusters to locate each MEP’s position
        on specific political dimensions.",
@@ -972,7 +972,7 @@ shinyUI(fluidPage(
                         
                         # 1. Panel: Clustering Methoden
                         tabsetPanel(
-                          tabPanel("Mapping Methods",
+                          tabPanel("Dimensionality Reduction",
                                    br(),
                                    
                                    fluidRow(column(width = 2),
@@ -1090,13 +1090,13 @@ shinyUI(fluidPage(
                                      
 
                                      mainPanel(
-                                       h3(p('Mapping Output', style = "color:salmon; text-align:center")),
+                                       h3(p('Reduction Output', style = "color:salmon; text-align:center")),
                                        hr(),
                                        
                                        # Explanatory Text with Arrow
                                        tags$div(
                                          style = "text-align:right; margin-bottom:15px;",
-                                         "Use the checkboxes in this column to select a mapping method for clustering.",
+                                         "Use the options in this column to select a dimensionality reduction method for clustering.",
                                          tags$div(
                                            style = "position:relative; display:inline-block; text-align:right;",
                                            tags$span(
@@ -1107,14 +1107,14 @@ shinyUI(fluidPage(
                                        ),
                                        
                                        # Mapping selection radio — only one can be active at a time
-                                       radioButtons("select_mapping", "Select mapping for clustering:",
+                                       radioButtons("select_mapping", "Select dimensionality reduction for clustering:",
                                                     choices = c("None" = "none",
-                                                                "DW-NOMINATE" = "dwnom",
+                                                                "W-NOMINATE" = "dwnom",
                                                                 "MCA" = "mca",
                                                                 "UMAP" = "umap"),
                                                     selected = "none", inline = TRUE),
 
-                                       # DW-NOMINATE Plot Section
+                                       # W-NOMINATE Plot Section
                                        fluidRow(
                                          class = "dwnom_plot_row",  # Add the class for highlighting
                                          column(
@@ -1438,8 +1438,8 @@ shinyUI(fluidPage(
                                                     tags$a(href = "https://parltrack.eu/about", target = "_blank", "Parltrack.eu")
                                                   ),
                                                   tags$li(
-                                                    "DW-NOMINATE method documentation and applications in legislative studies. Learn more ",
-                                                    tags$a(href = "https://voteview.com/about", target = "_blank", "about DW-NOMINATE.")
+                                                    "W-NOMINATE method documentation and applications in legislative studies. Learn more ",
+                                                    tags$a(href = "https://voteview.com/about", target = "_blank", "about W-NOMINATE.")
                                                   ),
                                                   tags$li(
                                                     "UMAP (Uniform Manifold Approximation and Projection) for dimension reduction in clustering analysis. Details available ",
@@ -1501,7 +1501,7 @@ shinyUI(fluidPage(
                                                 p(strong("MCA (Multiple Correspondence Analysis):"), 
                                                   "A method for reducing the dimensionality of categorical data by representing it in a lower-dimensional space."),
                                                 br(),
-                                                p(strong("DW-NOMINATE:"), 
+                                                p(strong("W-NOMINATE:"), 
                                                   "A scaling method commonly used in political science to map voting behavior onto ideological dimensions, such as economic and social dimensions."),
                                                 br(),
                                                 

@@ -1433,7 +1433,7 @@ shinyServer(function(input, output, session) {
 
   
   
-  # DW-NOMINATE Plot
+  # W-NOMINATE Plot
   observeEvent(input$runDWNom, {
     use_precomputed$dw_nom <- FALSE
     
@@ -1468,10 +1468,10 @@ shinyServer(function(input, output, session) {
       
       
 
-      # Render DW-NOMINATE plot
+      # Render W-NOMINATE plot
       ggplot(dwnom_data, aes(x = coord1D, y = coord2D, color = EPG)) +
         geom_point() +
-        labs(title = "DW-NOMINATE Plot", x = "DW1", y = "DW2") +
+        labs(title = "W-NOMINATE Plot", x = "DW1", y = "DW2") +
         scale_color_manual(values = party_colors) +
         theme_minimal() +
         theme(
@@ -1819,7 +1819,7 @@ shinyServer(function(input, output, session) {
   # Initial flag for precomputed image mode
   use_precomputed <- reactiveValues(dw_nom = TRUE, mca = TRUE, umap = TRUE)
   
-  # Display precomputed DW-NOMINATE plot or generate new one on button click
+  # Display precomputed W-NOMINATE plot or generate new one on button click
   output$dwNomPlotUI <- renderUI({
     if (use_precomputed$dw_nom) {
       output$dwnomPlot_pre <- renderPlot({
@@ -1864,10 +1864,10 @@ shinyServer(function(input, output, session) {
           rename(DW1 = all_of(coord1), DW2 = all_of(coord2))
         
 
-        # Render DW-NOMINATE plot
+        # Render W-NOMINATE plot
         ggplot(dwnom_data, aes(x = DW1, y = DW2, color = if (input$color_switch) "black" else EPG)) +
           geom_point() +
-          labs(title = "DW-NOMINATE Plot", x = "DW1", y = "DW2") +
+          labs(title = "W-NOMINATE Plot", x = "DW1", y = "DW2") +
           scale_color_manual(values = if (input$color_switch) c("black" = "black") else party_colors) +
           theme_minimal() +
           theme(
@@ -2031,7 +2031,7 @@ shinyServer(function(input, output, session) {
     if (sel == "dwnom") {
       output$icon_dwnom <- renderUI({ icon("crown", style = "color: gold; font-size: 3em;") })
       shinyjs::addClass(selector = ".dwnom_plot_row", class = "highlight")
-      selected_mapping("DW-NOMINATE")
+      selected_mapping("W-NOMINATE")
 
       output$finalClusterPlot <- renderPlot({
         settings <- get_party_settings()
@@ -2043,7 +2043,7 @@ shinyServer(function(input, output, session) {
 
         p <- ggplot(data, aes(x = .data[[col_x]], y = .data[[col_y]], color = EPG)) +
           geom_point() +
-          labs(title = "DW-NOMINATE Plot", x = "DW1", y = "DW2") +
+          labs(title = "W-NOMINATE Plot", x = "DW1", y = "DW2") +
           scale_color_manual(values = party_colors) +
           theme_minimal() +
           theme(
@@ -2127,7 +2127,7 @@ shinyServer(function(input, output, session) {
       return(datasets$umap_data)
     } else if (mapping == "MCA") {
       return(datasets$mca_data)
-    } else if (mapping == "DW-NOMINATE") {
+    } else if (mapping == "W-NOMINATE") {
       return(datasets$dwnom_data)
     } else {
       return(NULL)
@@ -2145,7 +2145,7 @@ shinyServer(function(input, output, session) {
   # Observe K-Means button and run clustering
   observeEvent(input$runKMeans, {
     if (is.null(selected_mapping())) {
-      showNotification("Please select a mapping method (DW-NOMINATE, MCA, or UMAP) in the Mapping Methods tab first.", type = "warning", duration = 6)
+      showNotification("Please select a dimensionality reduction method (W-NOMINATE, MCA, or UMAP) in the Dimensionality Reduction tab first.", type = "warning", duration = 6)
       return()
     }
 
@@ -2164,14 +2164,14 @@ shinyServer(function(input, output, session) {
       col_suffix <- if (input$use_final_votes_only) "_red" else ""
       num_dimensions <- min(input$mca_ncp, 10)
       clustering_columns <- paste0(col_prefix, 1:num_dimensions, col_suffix)
-    } else if (selected_mapping() == "DW-NOMINATE") {
-      # DW-NOMINATE is always 2D
+    } else if (selected_mapping() == "W-NOMINATE") {
+      # W-NOMINATE is always 2D
       clustering_columns <- if (input$use_final_votes_only) {
         c("coord2D_red", "coord1D_red")
       } else {
         c("coord1D", "coord2D")
       }
-      num_dimensions <- 2  # Always 2D for DW-NOMINATE
+      num_dimensions <- 2  # Always 2D for W-NOMINATE
     }
     
     # Remove rows with NAs in clustering columns
@@ -2186,7 +2186,7 @@ shinyServer(function(input, output, session) {
       datasets$umap_data <- data
     } else if (selected_mapping() == "MCA") {
       datasets$mca_data <- data
-    } else if (selected_mapping() == "DW-NOMINATE") {
+    } else if (selected_mapping() == "W-NOMINATE") {
       datasets$dwnom_data <- data
     }
     
@@ -2229,7 +2229,7 @@ shinyServer(function(input, output, session) {
   # Observe PAM button and run clustering
   observeEvent(input$runPAM, {
     if (is.null(selected_mapping())) {
-      showNotification("Please select a mapping method (DW-NOMINATE, MCA, or UMAP) in the Mapping Methods tab first.", type = "warning", duration = 6)
+      showNotification("Please select a dimensionality reduction method (W-NOMINATE, MCA, or UMAP) in the Dimensionality Reduction tab first.", type = "warning", duration = 6)
       return()
     }
 
@@ -2248,14 +2248,14 @@ shinyServer(function(input, output, session) {
       col_suffix <- if (input$use_final_votes_only) "_red" else ""
       num_dimensions <- min(input$mca_ncp, 10)
       clustering_columns <- paste0(col_prefix, 1:num_dimensions, col_suffix)
-    } else if (selected_mapping() == "DW-NOMINATE") {
-      # DW-NOMINATE is always 2D
+    } else if (selected_mapping() == "W-NOMINATE") {
+      # W-NOMINATE is always 2D
       clustering_columns <- if (input$use_final_votes_only) {
         c("coord2D_red", "coord1D_red")
       } else {
         c("coord1D", "coord2D")
       }
-      num_dimensions <- 2  # Always 2D for DW-NOMINATE
+      num_dimensions <- 2  # Always 2D for W-NOMINATE
     }
     
     # Remove rows with NAs in clustering columns
@@ -2270,7 +2270,7 @@ shinyServer(function(input, output, session) {
       datasets$umap_data <- data
     } else if (selected_mapping() == "MCA") {
       datasets$mca_data <- data
-    } else if (selected_mapping() == "DW-NOMINATE") {
+    } else if (selected_mapping() == "W-NOMINATE") {
       datasets$dwnom_data <- data
     }
     
@@ -2294,7 +2294,7 @@ shinyServer(function(input, output, session) {
   # Observe HDBSCAN button and run clustering
   observeEvent(input$runHDBSCAN, {
     if (is.null(selected_mapping())) {
-      showNotification("Please select a mapping method (DW-NOMINATE, MCA, or UMAP) in the Mapping Methods tab first.", type = "warning", duration = 6)
+      showNotification("Please select a dimensionality reduction method (W-NOMINATE, MCA, or UMAP) in the Dimensionality Reduction tab first.", type = "warning", duration = 6)
       return()
     }
 
@@ -2313,14 +2313,14 @@ shinyServer(function(input, output, session) {
       col_suffix <- if (input$use_final_votes_only) "_red" else ""
       num_dimensions <- min(input$mca_ncp, 10)
       clustering_columns <- paste0(col_prefix, 1:num_dimensions, col_suffix)
-    } else if (selected_mapping() == "DW-NOMINATE") {
-      # DW-NOMINATE is always 2D
+    } else if (selected_mapping() == "W-NOMINATE") {
+      # W-NOMINATE is always 2D
       clustering_columns <- if (input$use_final_votes_only) {
         c("coord2D_red", "coord1D_red")
       } else {
         c("coord1D", "coord2D")
       }
-      num_dimensions <- 2  # Always 2D for DW-NOMINATE
+      num_dimensions <- 2  # Always 2D for W-NOMINATE
     }
     
     # Remove rows with NAs in clustering columns
@@ -2335,7 +2335,7 @@ shinyServer(function(input, output, session) {
       datasets$umap_data <- data
     } else if (selected_mapping() == "MCA") {
       datasets$mca_data <- data
-    } else if (selected_mapping() == "DW-NOMINATE") {
+    } else if (selected_mapping() == "W-NOMINATE") {
       datasets$dwnom_data <- data
     }
     
@@ -3344,11 +3344,11 @@ shinyServer(function(input, output, session) {
         
         tags$div(class = "divider"),
         
-        # DW-NOMINATE 2nd Dimension Score Distribution
+        # W-NOMINATE 2nd Dimension Score Distribution
         fluidRow(
           column(
             width = 6,
-            h3("DW-NOMINATE 1st Dimension Score Distribution"),
+            h3("W-NOMINATE 1st Dimension Score Distribution"),
             plotOutput("dwNominatePlot", width = "500px")
           ),
           column(
@@ -3687,7 +3687,7 @@ shinyServer(function(input, output, session) {
   })
   
 
-  # DW-NOMINATE 2nd Dimension Score Distribution
+  # W-NOMINATE 2nd Dimension Score Distribution
   output$dwNominatePlot <- renderPlot({
     data <- get_selected_data()
     
@@ -3709,7 +3709,7 @@ shinyServer(function(input, output, session) {
     # Reverse the cluster order for the y-axis if desired
     data$Cluster <- factor(data$Cluster, levels = rev(sort(unique(data$Cluster))))
     
-    # Calculate the median DW-NOMINATE 2nd dimension score for each cluster
+    # Calculate the median W-NOMINATE 2nd dimension score for each cluster
     median_data <- data %>%
       group_by(Cluster) %>%
       summarize(median_coord2D = median(coord2D_red, na.rm = TRUE), .groups = "drop")
@@ -3720,7 +3720,7 @@ shinyServer(function(input, output, session) {
       geom_text(data = median_data, aes(x = median_coord2D, y = Cluster, label = round(median_coord2D, 2)), 
                 vjust = -0.5, color = "black") +
       scale_y_discrete(name = "Clusters") +
-      scale_x_continuous(name = "DW-NOMINATE 1st Dimension (Conservatism-Liberalism)") +
+      scale_x_continuous(name = "W-NOMINATE 1st Dimension (Conservatism-Liberalism)") +
       labs(title = "Political Left-Right-Distribution") +
       theme_minimal() +
       theme(
@@ -3819,11 +3819,11 @@ shinyServer(function(input, output, session) {
           }
         ),
         DW_Nominate_Distribution = colDef(
-          name = "DW-NOMINATE Score Distribution",
+          name = "W-NOMINATE Score Distribution",
           align = "center",
           width = 180,
           cell = function(values) {
-            # Create a sparkline for DW-NOMINATE distribution
+            # Create a sparkline for W-NOMINATE distribution
             sparkline(values, type = "bar", chartRangeMin = -1, chartRangeMax = 1)
           }
         )
