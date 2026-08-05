@@ -25,9 +25,22 @@ epg_colors <- c(
 
 shinyUI(fluidPage(
   theme = shinytheme("lumen"),  # Apply the Lumen theme
+  lang = "en",
 
   tags$head(
-    tags$link(rel = "icon", type = "image/svg+xml", href = "favicon.svg")
+    tags$link(rel = "icon", type = "image/svg+xml", href = "favicon.svg"),
+
+    # Meta description and social preview cards (used when the link is
+    # shared on social media, in chat apps, or indexed by search engines)
+    tags$meta(name = "description",
+              content = "Explore how Members of the European Parliament actually vote: interactive charts, maps and clustering across four legislative terms, 2004 to 2022."),
+    tags$meta(property = "og:title", content = "ParliamentLab"),
+    tags$meta(property = "og:description",
+              content = "An interactive application for exploring voting behavior in the European Parliament."),
+    tags$meta(property = "og:type", content = "website"),
+    tags$meta(property = "og:url", content = "https://parliamentlab.eu"),
+    tags$meta(property = "og:image", content = "https://parliamentlab.eu/parliamentlab_hex.png"),
+    tags$meta(name = "twitter:card", content = "summary")
   ),
 
   useShinyjs(),  # Enable shinyjs for interactivity
@@ -173,7 +186,7 @@ shinyUI(fluidPage(
                           div(style = "text-align: center; width: 200px;",
                               icon("database", "fa-3x", style = "color:#6495ED;"),
                               tags$h4("Data Collection"),
-                              tags$p("Using publicly available data on MEPs' voting records, I gathered detailed datasets spanning multiple legislative periods.")
+                              tags$p("Using publicly available data on MEPs' voting records, we gathered detailed datasets spanning multiple legislative periods.")
                           ),
                           
                           div(style = "text-align: center; width: 200px;",
@@ -185,7 +198,7 @@ shinyUI(fluidPage(
                           div(style = "text-align: center; width: 200px;",
                               icon("chart-line", "fa-3x", style = "color:#32CD32;"),
                               tags$h4("Exploratory Analysis"),
-                              tags$p("With visualizations and statistical summaries, I began uncovering initial patterns and trends in the voting data.")
+                              tags$p("With visualizations and statistical summaries, we began uncovering initial patterns and trends in the voting data.")
                           )
                         ),
                         
@@ -196,13 +209,13 @@ shinyUI(fluidPage(
                           div(style = "text-align: center; width: 200px;",
                               icon("project-diagram", "fa-3x", style = "color:#FF69B4;"),
                               tags$h4("Dimensionality Reduction"),
-                              tags$p("Using UMAP, MCA, and W-NOMINATE, I transformed high-dimensional voting data into a compact format for clustering.")
+                              tags$p("Using UMAP, MCA, and W-NOMINATE, we transformed high-dimensional voting data into a compact format for clustering.")
                           ),
                           
                           div(style = "text-align: center; width: 200px;",
                               icon("sitemap", "fa-3x", style = "color:#FF8C00;"),
                               tags$h4("Clustering"),
-                              tags$p("Applying K-Means, PAM, and HDBSCAN, I identified clusters representing potential political groups or alliances.")
+                              tags$p("Applying K-Means, PAM, and HDBSCAN, we identified clusters representing potential political groups or alliances.")
                           ),
                           
                           div(style = "text-align: center; width: 200px;",
@@ -216,10 +229,9 @@ shinyUI(fluidPage(
                         
                         hr(),
                         p(
-                          em("Submitted in partial fulfillment of the requirements", br("for the degree of Master of Science")),
-                          br(),
-                          em("Developed by"),
-                          br("John F. Brüne"),
+                          em("Companion application to the article"),
+                          br(em("“ParliamentLab: An Interactive Application for Exploring Voting Behavior in the European Parliament”")),
+                          br("John F. Brüne, Sophie Potts and Elisabeth Bergherr"),
                           style = "text-align:center; font-family: times"
                         )
                         ),
@@ -261,7 +273,7 @@ shinyUI(fluidPage(
                                       sidebarPanel(
                                         
                                         sliderInput("clusters", 
-                                                    "Chose the number of Clusters:", 
+                                                    "Choose the number of Clusters:", 
                                                     min = 2, 
                                                     max = 10, 
                                                     value = 8),
@@ -290,7 +302,9 @@ shinyUI(fluidPage(
                                           column(width = 1),  # Add an empty column on the left to center the yellowish box
                                           column(
                                             withMathJax(),
-                                            p('The K-Means algorithm aims to minimize the following objective function:', 
+                                            p('The ',
+                                              a(href = "https://doi.org/10.2307/2346830", target = "_blank", "K-Means algorithm"),
+                                              ' aims to minimize the following objective function:',
                                               style = "color:black;text-align:justify"),
                                             
                                             p('$$ \\text{argmin} \\sum_{i=1}^{k} \\sum_{x_j \\in C_i} || x_j - \\mu_i ||^2 $$', 
@@ -298,7 +312,7 @@ shinyUI(fluidPage(
                                             
                                             p("Here, \\(k\\) represents the number of clusters, \\(x_j\\) are the data points (voting records), and \\(\\mu_i\\) represents the centroid of each cluster \\(C_i\\). 
         The algorithm iteratively adjusts these centroids to minimize within-cluster variance, but the selection of \\(k\\) remains subjective. 
-        The clustering of unlabelled data is inherently flexible — meaning that one dataset could yield different numbers of clusters depending on interpretation and goals.",
+        The clustering of unlabelled data is inherently flexible: one dataset could yield different numbers of clusters depending on interpretation and goals.",
                                               style = "color:black;text-align:justify"),
                                             
                                             width = 10, 
@@ -794,7 +808,7 @@ shinyUI(fluidPage(
                      fluidRow(
                        column(width = 7, class = "plot-panel",
                          h4("Country Map"),
-                         p("The map shows the selected measure averaged by country — useful for spotting geographic patterns in MEP behavior."),
+                         p("The map shows the selected measure averaged by country, useful for spotting geographic patterns in MEP behavior."),
                          withSpinner(plotOutput("countryMapPlot"), type = 4, color = "#5b9bd5")
                        ),
                        column(width = 5, class = "plot-panel",
@@ -916,35 +930,43 @@ shinyUI(fluidPage(
                             width = 8,
                             h4("Dimensionality Reduction Techniques", style = "color:black;text-align:center"),
                             
-                            p("In this step, we employ three different dimensionality reduction techniques—UMAP, MCA, and W-NOMINATE—to progressively reveal patterns in the voting data. 
-       Each method has distinct strengths, and the process moves from a broad representation to a more targeted political spectrum approach. These dimensionality reduction methods help us
-       visualize latent voting patterns within the European Parliament.",
+                            p("In this step, we employ three different dimensionality reduction techniques (UMAP, MCA, and W-NOMINATE) to progressively reveal patterns in the voting data.
+       Each method has distinct strengths, and the process moves from a broad representation to a more targeted political spectrum approach. These dimensionality reduction methods help us visualize ",
+                              a(href = "https://doi.org/10.1111/j.1540-5907.2006.00198.x", target = "_blank", "latent voting patterns within the European Parliament."),
                               style = "color:black;text-align:justify"),
                             
                             br(),
                             
                             # W-NOMINATE Section
                             h4("1. W-NOMINATE - A Political Spectrum Analysis", style = "color:black"),
-                            p("W-NOMINATE is a widely used method in political science to map representatives onto a multidimensional ideological spectrum.
+                            p("W-NOMINATE is a ",
+                              a(href = "https://doi.org/10.2307/2111172", target = "_blank", "widely used method in political science"),
+                              " to map representatives onto a multidimensional ideological spectrum.
        It provides a detailed understanding of MEP alignments by placing them within an ideological context based on their voting behavior.
        This approach reveals ideological trends and bloc formations within the Parliament, helping us go beyond general clusters to locate each MEP’s position
-       on specific political dimensions.",
+       on specific political dimensions. The analysis in this app relies on the ",
+                              a(href = "https://doi.org/10.18637/jss.v042.i14", target = "_blank", "wnominate"),
+                              " implementation in R.",
                               class = "info-callout"),
 
                             br(),
 
                             # MCA Section
                             h4("2. MCA - A Categorical Perspective", style = "color:black"),
-                            p("Multiple Correspondence Analysis (MCA) refines our understanding by focusing on relationships between categorical voting behaviors.
+                            p(a(href = "https://www.routledge.com/Multiple-Correspondence-Analysis-and-Related-Methods/Greenacre-Blasius/p/book/9781584886280", target = "_blank", "Multiple Correspondence Analysis (MCA)"),
+                              " refines our understanding by focusing on relationships between categorical voting behaviors.
        This method is particularly helpful for data structured around discrete votes, as it identifies nuanced alignments between MEPs based on their voting responses.
-       MCA creates a focused clustering structure tailored to parliamentary voting patterns.",
+       MCA creates a focused clustering structure tailored to parliamentary voting patterns. Here, MCA is computed with the ",
+                              a(href = "https://doi.org/10.18637/jss.v025.i01", target = "_blank", "FactoMineR"),
+                              " package.",
                               class = "info-callout"),
 
                             br(),
 
                             # UMAP Section
                             h4("3. UMAP - An Overview", style = "color:black"),
-                            p("UMAP (Uniform Manifold Approximation and Projection) is a flexible tool for reducing high-dimensional data into a simpler, lower-dimensional space.
+                            p(a(href = "https://arxiv.org/abs/1802.03426", target = "_blank", "UMAP (Uniform Manifold Approximation and Projection)"),
+                              " is a flexible tool for reducing high-dimensional data into a simpler, lower-dimensional space.
        It provides an initial view into possible voting blocs within the Parliament, creating a visual representation of MEP voting data that highlights clusters
        without predefining any structure.",
                               class = "info-callout"),
@@ -1183,7 +1205,13 @@ shinyUI(fluidPage(
                                      sidebarPanel(
                                        
                                        h4("Clustering Methods"),
-                                       p("Choose a clustering method and adjust its settings. Each method offers a unique way to group MEPs based on voting patterns."),
+                                       p("Choose a clustering method and adjust its settings. Each method offers a unique way to group MEPs based on voting patterns: ",
+                                         a(href = "https://doi.org/10.2307/2346830", target = "_blank", "K-Means"),
+                                         " partitions MEPs around cluster centroids, ",
+                                         a(href = "https://doi.org/10.1002/9780470316801", target = "_blank", "PAM"),
+                                         " uses actual MEPs as cluster centers (medoids), and ",
+                                         a(href = "https://doi.org/10.1007/978-3-642-37456-2_14", target = "_blank", "HDBSCAN"),
+                                         " finds clusters of varying density and flags outliers."),
                                        
                                        tabsetPanel(
                                          tabPanel("K-Means",
@@ -1342,6 +1370,51 @@ shinyUI(fluidPage(
                               
                             )
                           )
+                          ,
+                          tabPanel(
+                            "Cluster Robustness",
+                            br(),
+
+                            fluidRow(column(width = 2),
+                                     column(
+                                       h4(p("Good clusters should survive small changes to the data and the settings. This tab checks whether yours do.", style = "color:black;text-align:center")),
+                                       width = 8, style = "background-color:lavender; border-radius: 10px")
+                            ),
+                            br(),
+                            sidebarLayout(
+                              sidebarPanel(
+                                h4("Robustness Settings"),
+                                uiOutput("robustSweepUI"),
+                                numericInput("robust_n_boot", "Number of re-runs:", value = 50, min = 20, max = 200, step = 10),
+                                checkboxInput("robust_ignore_noise", "(Only HDBSCAN) Disregard Cluster 0 (Outliers)", value = TRUE),
+                                actionButton("runRobustness", "Run the Stress Test", class = "btn-success"),
+                                width = 3
+                              ),
+
+                              mainPanel(
+                                h3("Stress-Testing the Clusters", style = "color:salmon; text-align:center"),
+                                p("The metrics tab tells you how good your clusters look. This tab asks a harder question: would you have found the same groups if things were slightly different? To find out, the app repeats your clustering with different settings, and then again on random samples of the MEPs. Real clusters survive both."),
+                                uiOutput("robustVerdict"),
+                                fluidRow(
+                                  column(
+                                    width = 6,
+                                    h4("What happens if you change the settings?"),
+                                    bsTooltip("sensitivityPlot", "Repeats the clustering with different settings. Flat lines mean the result does not depend on the exact setting."),
+                                    plotOutput("sensitivityPlot", height = "440px"),
+                                    uiOutput("sensitivityNote")
+                                  ),
+                                  column(
+                                    width = 6,
+                                    h4("Do the clusters come back on reshuffled data?"),
+                                    bsTooltip("jaccardPlot", "Repeats the clustering on random samples of MEPs and checks how much of each cluster comes back."),
+                                    plotOutput("jaccardPlot", height = "440px"),
+                                    p("For this test the app draws a random sample of MEPs, runs the clustering again, and checks how much of each original cluster it finds. It repeats that many times over. A cluster scoring above 0.75 is solid. One below 0.5 falls apart when the data shifts, so treat it as a suggestion rather than a finding. Statisticians call this a bootstrap; the cutoffs come from Hennig (2007).")
+                                  )
+                                ),
+                                width = 9
+                              )
+                            )
+                          )
                           
                           
                         )
@@ -1393,8 +1466,8 @@ shinyUI(fluidPage(
                           column(width = 2),
                           column(
                             h4(p("Key Terms and References", style = "color:black;text-align:center")),
-                            p("Here you’ll find a handy glossary of key terms and concepts, along with a list of references that helped shape this thesis. 
-     Think of this section as your go-to guide for understanding the ideas, methods, and insights shared throughout the work.",
+                            p("Here you’ll find a handy glossary of key terms and concepts, along with a list of references that shaped this project.
+     Think of this section as your go-to guide for understanding the ideas, methods, and insights shared throughout the app.",
                               style = "color:black;text-align:justify"),
                             width = 8, 
                             style = "background-color:#BFF7BB;border-radius: 10px"
@@ -1412,7 +1485,7 @@ shinyUI(fluidPage(
                                                 width = 12,
                                                 h4("References", style = "color:black;"),
                                                 p(
-                                                  "Below is the list of references used throughout the thesis. These references are cited in appropriate sections to provide academic credibility and 
+                                                  "Below is the list of references used throughout this project. These references are cited in appropriate sections to provide academic credibility and
      to acknowledge the authors whose work has contributed to this project.",
                                                   style = "color:black; text-align:justify; margin-bottom:15px;"
                                                 ),
@@ -1434,6 +1507,48 @@ shinyUI(fluidPage(
                                                     tags$a(href = "https://doi.org/10.1146/annurev-polisci-032311-110735", target = "_blank", "DOI link.")
                                                   ),
                                                   tags$li(
+                                                    "Poole, Keith T., and Rosenthal, Howard. (1985). A Spatial Model for Legislative Roll Call Analysis. ",
+                                                    tags$em("American Journal of Political Science"),
+                                                    ", 29(2), 357–384. ",
+                                                    tags$a(href = "https://doi.org/10.2307/2111172", target = "_blank", "DOI link.")
+                                                  ),
+                                                  tags$li(
+                                                    "Poole, Keith, Lewis, Jeffrey, Lo, James, and Carroll, Royce. (2011). Scaling Roll Call Votes with wnominate in R. ",
+                                                    tags$em("Journal of Statistical Software"),
+                                                    ", 42(14), 1–21. ",
+                                                    tags$a(href = "https://doi.org/10.18637/jss.v042.i14", target = "_blank", "DOI link.")
+                                                  ),
+                                                  tags$li(
+                                                    "Greenacre, Michael, and Blasius, Jörg (Eds.). (2006). ",
+                                                    tags$em("Multiple Correspondence Analysis and Related Methods"),
+                                                    ". Chapman & Hall/CRC. ",
+                                                    tags$a(href = "https://www.routledge.com/Multiple-Correspondence-Analysis-and-Related-Methods/Greenacre-Blasius/p/book/9781584886280", target = "_blank", "Publisher link.")
+                                                  ),
+                                                  tags$li(
+                                                    "Hartigan, John A., and Wong, M. Anthony. (1979). Algorithm AS 136: A K-Means Clustering Algorithm. ",
+                                                    tags$em("Journal of the Royal Statistical Society, Series C (Applied Statistics)"),
+                                                    ", 28(1), 100–108. ",
+                                                    tags$a(href = "https://doi.org/10.2307/2346830", target = "_blank", "DOI link.")
+                                                  ),
+                                                  tags$li(
+                                                    "Kaufman, Leonard, and Rousseeuw, Peter J. (1990). ",
+                                                    tags$em("Finding Groups in Data: An Introduction to Cluster Analysis"),
+                                                    ". Wiley. ",
+                                                    tags$a(href = "https://doi.org/10.1002/9780470316801", target = "_blank", "DOI link.")
+                                                  ),
+                                                  tags$li(
+                                                    "Campello, Ricardo J. G. B., Moulavi, Davoud, and Sander, Jörg. (2013). Density-Based Clustering Based on Hierarchical Density Estimates. ",
+                                                    tags$em("Advances in Knowledge Discovery and Data Mining (PAKDD 2013)"),
+                                                    ", 160–172. ",
+                                                    tags$a(href = "https://doi.org/10.1007/978-3-642-37456-2_14", target = "_blank", "DOI link.")
+                                                  ),
+                                                  tags$li(
+                                                    "Rousseeuw, Peter J. (1987). Silhouettes: A Graphical Aid to the Interpretation and Validation of Cluster Analysis. ",
+                                                    tags$em("Journal of Computational and Applied Mathematics"),
+                                                    ", 20, 53–65. ",
+                                                    tags$a(href = "https://doi.org/10.1016/0377-0427(87)90125-7", target = "_blank", "DOI link.")
+                                                  ),
+                                                  tags$li(
                                                     "Parltrack.eu: Biographical Data on Members of the European Parliament. Visit ",
                                                     tags$a(href = "https://parltrack.eu/about", target = "_blank", "Parltrack.eu")
                                                   ),
@@ -1442,16 +1557,20 @@ shinyUI(fluidPage(
                                                     tags$a(href = "https://voteview.com/about", target = "_blank", "about W-NOMINATE.")
                                                   ),
                                                   tags$li(
-                                                    "UMAP (Uniform Manifold Approximation and Projection) for dimension reduction in clustering analysis. Details available ",
-                                                    tags$a(href = "https://arxiv.org/abs/1802.03426", target = "_blank", "here.")
+                                                    "McInnes, Leland, Healy, John, and Melville, James. (2018). UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction. ",
+                                                    tags$em("arXiv preprint"),
+                                                    ", arXiv:1802.03426. ",
+                                                    tags$a(href = "https://arxiv.org/abs/1802.03426", target = "_blank", "arXiv link.")
                                                   ),
                                                   tags$li(
                                                     "HDBSCAN clustering methodology and its applications in density-based clustering. Refer to ",
                                                     tags$a(href = "https://hdbscan.readthedocs.io/en/latest/index.html", target = "_blank", "the official documentation.")
                                                   ),
                                                   tags$li(
-                                                    "FactoMineR: Statistical Methods for MCA and PCA analysis. Visit ",
-                                                    tags$a(href = "http://factominer.free.fr/", target = "_blank", "FactoMineR.")
+                                                    "Lê, Sébastien, Josse, Julie, and Husson, François. (2008). FactoMineR: An R Package for Multivariate Analysis. ",
+                                                    tags$em("Journal of Statistical Software"),
+                                                    ", 25(1), 1–18. ",
+                                                    tags$a(href = "https://doi.org/10.18637/jss.v025.i01", target = "_blank", "DOI link.")
                                                   ),
                                                   tags$li(
                                                     "Flagpedia for country flag icons. Check ",

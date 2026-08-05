@@ -6,6 +6,10 @@
 app = 'masterthesis-eustat'
 primary_region = 'fra'
 
+# Swap gives the 1 GB VM headroom for memory spikes (live MCA/UMAP re-runs)
+# instead of the OOM killer restarting the app.
+swap_size_mb = 512
+
 [build]
 
 [http_service]

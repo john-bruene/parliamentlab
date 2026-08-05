@@ -6,7 +6,7 @@ pkgs <- c(
   "DT", "reactable", "plotly", "ggiraph", "sparkline", "sortable",
   "ggplot2", "gridExtra", "scales", "bslib",
   "dplyr", "tidyr",
-  "cluster", "clusterCrit", "dbscan", "umap", "FactoMineR",
+  "cluster", "clusterCrit", "dbscan", "umap", "FactoMineR", "mclust",
   "packcircles", "sf",
   "qs"   # optional — faster data I/O; the app works without it
 )

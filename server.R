@@ -18,6 +18,10 @@ library(sparkline)
 library(scales)
 library(gridExtra)
 
+# Show visitors a generic error message instead of raw R errors,
+# which can leak file paths and internals on the public site
+options(shiny.sanitize.errors = TRUE)
+
 # Null-coalescing operator (available in R 4.4+ as |>, replicated here for safety)
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
 
@@ -48,13 +52,57 @@ timed <- if (.PROFILE) {
 # coord1D / coord2D_red sign flips for P7-P9 are baked in; see the
 # conversion script for details. Regenerate the .rds files whenever the
 # source CSV / XLSX change.
-# Parliament data is lazy-loaded per session (see parl_cache inside shinyServer).
-# Only the selected legislature is kept in memory — ~3× RAM saving vs loading all 4.
+# Parliament data is lazy-loaded into a process-level cache (see .data_cache
+# below): the first session to request a legislature pays the read, every
+# later session shares the same copy.
 
 # SHP_0 loaded once globally — shared across all sessions, rarely changes
 SHP_0 <- timed("readRDS SHP_0", readRDS("data/SHP_0.rds"))
 
 five_thirty <- read.csv("www/clustered_congress.csv")
+
+# ── Process-level data cache, shared across sessions ────────────────────────
+# One copy of each parliament dataset per R process. A parliament dataset is
+# ~90 MB in memory, so the previous per-session cache meant every concurrent
+# visitor held their own copy — too much for the 512 MB / 1 GB instances the
+# app is hosted on. The cached objects are read-only after load (all
+# downstream code works on its own derived copies), so sharing is safe.
+.data_cache <- new.env(parent = emptyenv())
+
+# ── MEP photo cache on disk ─────────────────────────────────────────────────
+# Photos are downloaded once and then served by the app itself under
+# /mepphotos/. Embedding them as base64 data: URIs instead looks fine in a
+# normal browser but not everywhere — RStudio's built-in viewer will not
+# render a 70k-character src, so the image silently falls back to the
+# placeholder. A same-origin file works in every viewer, keeps the DOM small
+# and lets the browser cache the image.
+.photo_dir <- file.path(tempdir(), "mep_photos")
+dir.create(.photo_dir, showWarnings = FALSE, recursive = TRUE)
+shiny::addResourcePath("mepphotos", .photo_dir)
+
+load_parl <- function(p) {
+  if (is.null(.data_cache[[p]])) {
+    qs_path <- paste0("data/", p, "_umap.qs")
+    if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
+      .data_cache[[p]] <- timed(paste("qs::qread", p), qs::qread(qs_path))
+    } else {
+      .data_cache[[p]] <- timed(paste("readRDS", p), readRDS(paste0("data/", p, "_umap.rds")))
+    }
+  }
+  .data_cache[[p]]
+}
+
+load_voted <- function() {
+  if (is.null(.data_cache$EP6_9_Voted)) {
+    qs_path <- "data/EP6_9_Voted.qs"
+    if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
+      .data_cache$EP6_9_Voted <- timed("qs::qread EP6_9_Voted", qs::qread(qs_path))
+    } else {
+      .data_cache$EP6_9_Voted <- timed("readRDS EP6_9_Voted", readRDS("data/EP6_9_Voted.rds"))
+    }
+  }
+  .data_cache$EP6_9_Voted
+}
 
 
 #####---------------------------------------
@@ -69,39 +117,10 @@ five_thirty <- read.csv("www/clustered_congress.csv")
 
 shinyServer(function(input, output, session) {
 
-  # ── Per-session lazy data cache ─────────────────────────────────────────────
-  # Each session only loads the parliament(s) it actually uses.
-  # Switching legislature within a session caches the new dataset but keeps
-  # the previous one; the typical single-parliament session uses ~1/4 the RAM
-  # of the old approach (all 4 loaded at startup for every session).
-  parl_cache  <- reactiveValues(P6 = NULL, P7 = NULL, P8 = NULL, P9 = NULL)
-  voted_cache <- reactiveVal(NULL)   # load_voted() — only needed for DW-NOM/MCA/UMAP re-run
+  # Data loading now goes through the process-level .data_cache defined above
+  # shinyServer() — shared across sessions instead of one copy per visitor.
 
-  load_parl <- function(p) {
-    if (is.null(parl_cache[[p]])) {
-      qs_path <- paste0("data/", p, "_umap.qs")
-      if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
-        parl_cache[[p]] <- timed(paste("qs::qread", p), qs::qread(qs_path))
-      } else {
-        parl_cache[[p]] <- timed(paste("readRDS", p), readRDS(paste0("data/", p, "_umap.rds")))
-      }
-    }
-    parl_cache[[p]]
-  }
-
-  load_voted <- function() {
-    if (is.null(voted_cache())) {
-      qs_path <- "data/EP6_9_Voted.qs"
-      if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
-        voted_cache(timed("qs::qread EP6_9_Voted", qs::qread(qs_path)))
-      } else {
-        voted_cache(timed("readRDS EP6_9_Voted", readRDS("data/EP6_9_Voted.rds")))
-      }
-    }
-    voted_cache()
-  }
-
-  # ── Best clustering defaults (from thesis, Section 6) ──────────────────────
+  # ── Best clustering defaults (from the companion article's analysis) ────────
   # UMAP + HDBSCAN consistently yielded the highest silhouette scores.
   # Used to auto-initialise Step 5 when the user skips Steps 2–4.
   best_defaults <- list(
@@ -166,7 +185,7 @@ shinyServer(function(input, output, session) {
   
   output$downloadPlots <- downloadHandler(
     filename = function() {
-      paste("plots.pdf")
+      "plots.pdf"
     },
     content = function(file) {
       req(clusterPlotObject())
@@ -195,10 +214,11 @@ shinyServer(function(input, output, session) {
           legend.key.size = unit(0.8, "cm")                   # Schlüsselgröße der Legende
         )
       
-      # PDF exportieren
+      # PDF exportieren — on.exit stellt sicher, dass das Device auch bei
+      # einem Fehler in grid.arrange() geschlossen wird
       pdf(file, width = 16.54, height = 5.84, pointsize = 3)
+      on.exit(dev.off(), add = TRUE)
       grid.arrange(finalClusterPlot, clusterPlot, ncol = 2)
-      dev.off()
     }
   )
   
@@ -529,13 +549,9 @@ shinyServer(function(input, output, session) {
       # Replace NAs with 0 in the selected columns
       datasets$cleanedData <- datasets$cleanedData %>%
         dplyr::mutate_at(vars(one_of(columns_to_replace)), ~replace(., is.na(.), 0))
-      
-      # Update the cleaned data preview after replacement
-      output$cleanedDataPreview <- DT::renderDataTable({
-        selected_columns <- datasets$cleanedData %>% 
-          select("full", "Country", "Party", "EPG", "X1", "X2", "X3", "Photo", "birthdate", "birthplace", "Gender", "CRE", "WDECL", "COMPARL", "REPORT", "REPORT_SHADOW", "COMPARL_SHADOW", "MOTION", "OQ", "WEXP", "WQ", "MINT", "IMOTION", "PRUNACT")
-        selected_columns
-      })
+
+      # The main cleanedDataPreview render (below) reacts to datasets$cleanedData
+      # automatically — no re-registration needed here.
     }
   })
   
@@ -640,11 +656,11 @@ shinyServer(function(input, output, session) {
           h5(strong("Topic Scores Formula:")),
           p("Topic scores represent how a politician votes on specific issues or topics. They are calculated as the proportion of votes in favor of a topic."),
           withMathJax(p("$$ Topic~Score = \\frac{Votes~on~Topic}{Total~Votes~on~Topic} $$")),
-          p("You can chose the the topic scores you want to create"),
+          p("You can choose the topic scores you want to create"),
           checkboxGroupInput(
-            "topicColumns", 
-            "Chose topics:", 
-            choices = c("Economic", "Social", "Foreign Policy", "Industry", "Education", "Healthcare", "Justice", "Agriculture", "Budget", "Gender", "Civil Libierties", "Trade", "Transport"),
+            "topicColumns",
+            "Choose topics:",
+            choices = c("Economic", "Social", "Foreign Policy", "Industry", "Education", "Healthcare", "Justice", "Agriculture", "Budget", "Gender", "Civil Liberties", "Trade", "Transport"),
             selected = c("Economic", "Social", "Foreign Policy", "Industry", "Education", "Healthcare") # These columns will be pre-selected
           )
         )
@@ -1106,7 +1122,7 @@ shinyServer(function(input, output, session) {
   # Download button functionality for the transformed dataset
   output$downloadFinalData <- downloadHandler(
     filename = function() {
-      paste("final_dataset.csv")
+      "final_dataset.csv"
     },
     content = function(file) {
       req(datasets$transformedData)
@@ -1203,7 +1219,7 @@ shinyServer(function(input, output, session) {
         Avg_Selected_Variable = mean(selected_value, na.rm = TRUE),
         Num_MEPs = n()
       ) %>%
-      arrange(match(EPG_short, levels(factor(axis_labels))))  # Sortieren nach Reihenfolge im Boxplot
+      arrange(EPG_short)  # Faktor-Level sind bereits in Boxplot-Reihenfolge (links-rechts)
     
     # Kompakte Tabelle rendern
     reactable(
@@ -2198,6 +2214,8 @@ shinyServer(function(input, output, session) {
     }
     
     clusteringCompleted(TRUE)
+    last_run$method <- "K-Means"
+    last_run$param  <- input$kmeans_k
     cluster_plot <- generateClusterPlot(data, clustering_columns, "K-Means", input$kmeans_k)
     clusterPlotObject(cluster_plot)
 
@@ -2214,8 +2232,10 @@ shinyServer(function(input, output, session) {
       kmeans(data[, c(col_x, col_y)], centers = k, nstart = 10)$tot.withinss
     })
     
-    # Render the elbow plot
-    output$elbowPlot <- renderPlot({
+    # Return the render object — the caller assigns it to the right output
+    # (elbowPlotK / elbowPlotPAM). Assigning output$elbowPlot here would
+    # overwrite the separate elbow plot in the Metrics tab.
+    renderPlot({
       plot(1:max_clusters, sse, type = "b", pch = 19, col = "blue",
            xlab = "Number of Clusters", ylab = "Total Within Sum of Squares (SSE)",
            main = "Elbow Method for Optimal Clustering")
@@ -2282,6 +2302,8 @@ shinyServer(function(input, output, session) {
     }
     
     clusteringCompleted(TRUE)
+    last_run$method <- "PAM"
+    last_run$param  <- input$pam_k
     cluster_plot <- generateClusterPlot(data, clustering_columns, "PAM", input$pam_k)
     clusterPlotObject(cluster_plot)
 
@@ -2341,6 +2363,8 @@ shinyServer(function(input, output, session) {
     
     # Render cluster plot
     clusteringCompleted(TRUE)
+    last_run$method <- "HDBSCAN"
+    last_run$param  <- input$hdbscan_minPts
     cluster_plot <- generateClusterPlot(data, clustering_columns, "HDBSCAN", input$hdbscan_minPts)
     clusterPlotObject(cluster_plot)
 
@@ -2457,11 +2481,11 @@ shinyServer(function(input, output, session) {
                           ifelse(ch_index_value > 1500, "yellow", "red"))
           
           ggplot() +
-            geom_col(aes(x = "DB Index", y = ch_index_value), fill = color, width = 0.4) +
-            geom_hline(yintercept = 0.5, linetype = "dashed", color = "green") +
-            geom_hline(yintercept = 1.5, linetype = "dashed", color = "yellow") +
-            annotate("text", x = 1, y = ch_index_value + 0.1, label = round(ch_index_value, 3), size = 5) +
-            coord_cartesian(ylim = c(0, max(2, ch_index_value + 0.5))) +
+            geom_col(aes(x = "CH Index", y = ch_index_value), fill = color, width = 0.4) +
+            geom_hline(yintercept = 3000, linetype = "dashed", color = "green") +
+            geom_hline(yintercept = 1500, linetype = "dashed", color = "yellow") +
+            annotate("text", x = 1, y = ch_index_value * 1.05, label = round(ch_index_value, 1), size = 5) +
+            coord_cartesian(ylim = c(0, max(3500, ch_index_value * 1.15))) +
             ggtitle("Calinski-Harabasz Index") +
             ylab("Index Value") +
             theme_minimal() +
@@ -2552,6 +2576,283 @@ shinyServer(function(input, output, session) {
 
   
   
+  ############################
+  ### CLUSTER ROBUSTNESS   ###
+  ############################
+  # New tab after "Cluster Metrics and Stability".
+  # Answers: "Would I get the same clusters if I changed something that
+  # should not matter?" Two checks:
+  #   1. Parameter sensitivity sweep — re-runs the last clustering method
+  #      over a range of parameter values (minPts or k).
+  #   2. Per-cluster bootstrap stability — mean Jaccard similarity between
+  #      each original cluster and its best match after re-clustering
+  #      bootstrap samples (Hennig 2007; > 0.75 stable, < 0.5 dissolved).
+
+  # Which method/parameter produced the current Cluster column — set by the
+  # K-Means / PAM / HDBSCAN observers and by do_load_best().
+  last_run <- reactiveValues(method = NULL, param = NULL)
+
+  robust_results <- reactiveVal(NULL)
+
+  # 2D coordinate columns of the active mapping — prefers the variant matching
+  # the final-votes checkbox but falls back to whichever columns exist
+  # (the precomputed best-results data only has UMAP1/UMAP2).
+  robust_xy_cols <- function(data) {
+    mapping <- selected_mapping()
+    cands <- if (identical(mapping, "MCA")) {
+      list(c("MCA1_red", "MCA2_red"), c("MCA1", "MCA2"))
+    } else if (identical(mapping, "W-NOMINATE")) {
+      list(c("coord1D_red", "coord2D_red"), c("coord1D", "coord2D"))
+    } else {
+      list(c("UMAP1_red", "UMAP2_red"), c("UMAP1", "UMAP2"))
+    }
+    if (!isTRUE(input$use_final_votes_only)) cands <- rev(cands)
+    for (cols in cands) {
+      if (all(cols %in% colnames(data))) return(cols)
+    }
+    NULL
+  }
+
+  # Re-run the active clustering method with a given parameter value
+  robust_recluster <- function(coords, method, value) {
+    switch(method,
+           "HDBSCAN" = dbscan::hdbscan(coords, minPts = value)$cluster,
+           "K-Means" = kmeans(coords, centers = value, nstart = 10)$cluster,
+           "PAM"     = cluster::pam(coords, k = value, cluster.only = TRUE))
+  }
+
+  observeEvent(input$runRobustness, {
+    if (is.null(selected_mapping()) || is.null(last_run$method)) {
+      showNotification("Please run a clustering method in the Clustering Methods tab first (or load the recommended results).", type = "warning", duration = 6)
+      return()
+    }
+    data <- get_selected_data()
+    req(data)
+    if (!"Cluster" %in% colnames(data)) {
+      showNotification("No cluster assignment found. Please run a clustering method first.", type = "warning", duration = 6)
+      return()
+    }
+    xy <- robust_xy_cols(data)
+    if (is.null(xy)) {
+      showNotification("Could not find the 2D coordinates for the selected mapping.", type = "error", duration = 6)
+      return()
+    }
+
+    method <- last_run$method
+    param  <- last_run$param
+    ignore_noise <- method == "HDBSCAN" && isTRUE(input$robust_ignore_noise)
+
+    pts <- data[complete.cases(data[, xy]) & !is.na(data$Cluster), ]
+    coords <- as.matrix(pts[, xy])
+    orig_clusters <- as.integer(as.character(pts$Cluster))
+    n <- nrow(coords)
+
+    withProgress(message = "Running robustness analysis...", value = 0, {
+
+      # ── 1. Parameter sensitivity sweep ──────────────────────────────────────
+      set.seed(123)
+      if (method == "HDBSCAN") {
+        rng <- input$robust_minpts_range %||% c(10, 40)
+        sweep_vals <- seq(rng[1], rng[2], by = 5)
+      } else {
+        rng <- input$robust_k_range %||% c(2, 10)
+        sweep_vals <- seq(rng[1], rng[2])
+      }
+      full_dist <- dist(coords)
+
+      sweep_list <- lapply(sweep_vals, function(v) {
+        cl <- robust_recluster(coords, method, v)
+        noise_share <- if (method == "HDBSCAN") mean(cl == 0) else NA_real_
+        keep <- if (ignore_noise) cl != 0 else rep(TRUE, length(cl))
+        n_cl <- length(unique(cl[keep]))
+        sil <- if (n_cl >= 2 && sum(keep) > n_cl) {
+          d <- if (all(keep)) full_dist else dist(coords[keep, , drop = FALSE])
+          mean(silhouette(as.integer(factor(cl[keep])), d)[, "sil_width"])
+        } else NA_real_
+        incProgress(0.5 / length(sweep_vals), detail = paste("Testing parameter", v))
+        data.frame(value = v, n_clusters = n_cl, noise_share = noise_share, silhouette = sil)
+      })
+      sweep_df <- do.call(rbind, sweep_list)
+
+      # ── 2. Per-cluster bootstrap Jaccard stability ──────────────────────────
+      set.seed(123)
+      B <- input$robust_n_boot %||% 50
+      clus_ids <- sort(unique(orig_clusters))
+      if (ignore_noise) clus_ids <- setdiff(clus_ids, 0)
+      jac_mat <- matrix(NA_real_, nrow = B, ncol = length(clus_ids))
+
+      for (b in seq_len(B)) {
+        idx <- sample.int(n, replace = TRUE)
+        boot_cl <- robust_recluster(coords[idx, , drop = FALSE], method, param)
+        for (ci in seq_along(clus_ids)) {
+          orig_members <- unique(idx[orig_clusters[idx] == clus_ids[ci]])
+          if (length(orig_members) == 0) next
+          best <- 0
+          for (bc in unique(boot_cl)) {
+            if (method == "HDBSCAN" && bc == 0) next
+            boot_members <- unique(idx[boot_cl == bc])
+            jac <- length(intersect(orig_members, boot_members)) /
+                   length(union(orig_members, boot_members))
+            if (jac > best) best <- jac
+          }
+          jac_mat[b, ci] <- best
+        }
+        incProgress(0.5 / B, detail = paste("Bootstrap sample", b, "of", B))
+      }
+      jac_df <- data.frame(Cluster = factor(clus_ids),
+                           Jaccard = colMeans(jac_mat, na.rm = TRUE))
+
+      robust_results(list(method = method, param = param, n_boot = B,
+                          sweep = sweep_df, jac = jac_df))
+    })
+  })
+
+  # Placeholder shown before the first run (same style as clusterPlot)
+  robust_placeholder <- function(msg) {
+    ggplot() +
+      annotate("text", x = 0.5, y = 0.5, label = msg,
+               size = 5, color = "grey55", hjust = 0.5, vjust = 0.5,
+               lineheight = 1.4) +
+      theme_void()
+  }
+
+  # Dynamic sweep-range slider depending on the active method
+  output$robustSweepUI <- renderUI({
+    if (is.null(last_run$method)) {
+      return(p("Run a clustering method in the 'Clustering Methods' tab first. The stress test repeats whatever you ran last.",
+               style = "color:#777;"))
+    }
+    if (last_run$method == "HDBSCAN") {
+      tagList(
+        p(strong("Active method:"), paste0(" HDBSCAN (minPts = ", last_run$param, ")")),
+        sliderInput("robust_minpts_range", "minPts range to test:",
+                    min = 5, max = 60, value = c(10, 40), step = 5)
+      )
+    } else {
+      tagList(
+        p(strong("Active method:"), paste0(" ", last_run$method, " (k = ", last_run$param, ")")),
+        sliderInput("robust_k_range", "Number of clusters (k) to test:",
+                    min = 2, max = 12, value = c(2, 10), step = 1)
+      )
+    }
+  })
+
+  # Plain-language summary above the plots
+  output$robustVerdict <- renderUI({
+    res <- robust_results()
+    if (is.null(res)) {
+      return(div(class = "info-callout",
+                 p("Pick the settings on the left and press ",
+                   strong("Run the Stress Test"),
+                   ". The app repeats your last clustering with different settings and on reshuffled data to see whether the clusters hold up.")))
+    }
+    param_lab <- if (res$method == "HDBSCAN") "minPts" else "k"
+    n_stable  <- sum(res$jac$Jaccard > 0.75)
+    n_total   <- nrow(res$jac)
+    mean_jac  <- mean(res$jac$Jaccard)
+    came_back <- if (n_stable == n_total) {
+      sprintf("All %d clusters", n_total)
+    } else {
+      sprintf("%d of the %d clusters", n_stable, n_total)
+    }
+    # Judge by how many clusters held up, not by the average alone: a couple of
+    # very solid clusters can pull the mean above 0.75 while half the groups
+    # are falling apart, which would read as far too reassuring.
+    frac_stable <- n_stable / n_total
+    verdict <- if (frac_stable == 1) {
+      "You can trust these groups."
+    } else if (frac_stable >= 0.5) {
+      "Trust the solid ones and treat the rest as hints rather than findings."
+    } else {
+      "Most of these groups do not survive reshuffling. Try different settings or another method."
+    }
+    div(class = "info-callout",
+        p(strong("The result: "),
+          sprintf("the app re-ran %s (%s = %s) on %d random samples of the MEPs. %s came back reliably, with an average recovery score of %.2f out of 1. %s",
+                  res$method, param_lab, res$param, res$n_boot, came_back, mean_jac, verdict)))
+  })
+
+  # Panel 1: parameter sensitivity sweep
+  output$sensitivityPlot <- renderPlot({
+    res <- robust_results()
+    if (is.null(res)) {
+      return(robust_placeholder("Press 'Run the Stress Test' to see\nwhat different settings would give you"))
+    }
+    df <- res$sweep
+    param_lab <- if (res$method == "HDBSCAN") "minPts" else "k"
+
+    # The cluster count is only worth plotting for HDBSCAN, where the
+    # algorithm decides how many clusters there are. For K-Means and PAM the
+    # count is the setting the user typed in, so the panel would just draw the
+    # line y = x and tell nobody anything.
+    long <- rbind(
+      data.frame(value = df$value, metric = "Cluster quality (silhouette)", y = df$silhouette),
+      if (res$method == "HDBSCAN")
+        data.frame(value = df$value, metric = "Number of clusters found", y = df$n_clusters),
+      if (res$method == "HDBSCAN")
+        data.frame(value = df$value, metric = "Share of MEPs left unclustered", y = df$noise_share)
+    )
+    long$metric <- factor(long$metric,
+                          levels = c("Cluster quality (silhouette)", "Number of clusters found",
+                                     "Share of MEPs left unclustered"))
+
+    ggplot(long, aes(x = value, y = y)) +
+      geom_line(color = "#2c7fb8") +
+      geom_point(color = "#2c7fb8", size = 2) +
+      geom_vline(xintercept = res$param, color = "red", linetype = "dashed") +
+      facet_wrap(~metric, ncol = 1, scales = "free_y") +
+      labs(title = "Same data, different settings",
+           subtitle = paste("The red line marks the", param_lab, "you used"),
+           x = param_lab, y = NULL) +
+      theme_minimal() +
+      theme(plot.title = element_text(size = 16, face = "bold"),
+            strip.text = element_text(size = 12, face = "bold"))
+  })
+
+  # How to read the sweep — the answer differs by method, because with
+  # K-Means and PAM the number of clusters is chosen by the user, while
+  # HDBSCAN works it out from the data.
+  output$sensitivityNote <- renderUI({
+    res <- robust_results()
+    method <- if (is.null(res)) last_run$method else res$method
+    if (identical(method, "HDBSCAN")) {
+      p("minPts sets how many members a group needs before HDBSCAN accepts it as a cluster. The algorithm then works out how many clusters the data contains, so these lines can genuinely surprise you. What you want is a flat stretch around the red mark: the same number of clusters, similar quality, and no jump in the share of MEPs left out.")
+    } else {
+      p("With K-Means and PAM you tell the algorithm how many clusters to find, so it always returns exactly that many. The number of clusters is your choice, not a result, which is why it is not plotted here. The real question is whether the split gets cleaner or messier. A peak marks the k that separates MEPs best, and a flat stretch means your exact choice hardly matters.")
+    }
+  })
+
+  # Panel 2: per-cluster bootstrap Jaccard stability
+  output$jaccardPlot <- renderPlot({
+    res <- robust_results()
+    if (is.null(res)) {
+      return(robust_placeholder("Press 'Run the Stress Test' to see\nwhether the clusters come back"))
+    }
+    jd <- res$jac
+    jd$state <- cut(jd$Jaccard, breaks = c(-Inf, 0.5, 0.75, Inf),
+                    labels = c("falls apart", "shaky", "solid"))
+
+    ggplot(jd, aes(x = Cluster, y = Jaccard, fill = state)) +
+      geom_col(width = 0.6) +
+      geom_text(aes(label = sprintf("%.2f", Jaccard)), vjust = -0.4, size = 4.5) +
+      geom_hline(yintercept = 0.75, linetype = "dashed", color = "grey40") +
+      geom_hline(yintercept = 0.5,  linetype = "dotted", color = "grey40") +
+      annotate("text", x = 0.55, y = 0.77, label = "solid", hjust = 0, size = 3.5, color = "grey40") +
+      annotate("text", x = 0.55, y = 0.52, label = "shaky", hjust = 0, size = 3.5, color = "grey40") +
+      scale_fill_manual(values = c("solid" = "#1b9e77", "shaky" = "#e6ab02", "falls apart" = "#d95f02"),
+                        drop = FALSE) +
+      coord_cartesian(ylim = c(0, 1.05)) +
+      labs(title = "The Re-Run Test",
+           subtitle = paste0("How completely each cluster is recovered, averaged over ",
+                             res$n_boot, " re-runs (1 = fully)"),
+           x = "Cluster", y = "Recovery score", fill = NULL) +
+      theme_minimal() +
+      theme(plot.title = element_text(size = 16, face = "bold"),
+            legend.position = "bottom")
+  })
+
+
+
   output$clusterPlot_538 <- renderPlot({
     # ── Data preparation ───────────────────────────────────────────────────────
     # For k=8: use the pre-existing 538 cluster labels from the CSV directly.
@@ -3083,8 +3384,9 @@ shinyServer(function(input, output, session) {
           NULL
         }
 
-        # Fetch MEP photo server-side and serve as base64 data URI so it works
-        # in RStudio's WebView, which blocks direct external image URLs.
+        # Fetch the MEP photo server-side once, then hand the browser a normal
+        # same-origin URL (see .photo_dir above). Fetching server-side is still
+        # needed because RStudio's viewer blocks direct external image URLs.
         photo_src <- tryCatch({
           photo_url <- if ("Photo" %in% colnames(politician_info) &&
                            !is.na(politician_info$Photo) &&
@@ -3092,14 +3394,26 @@ shinyServer(function(input, output, session) {
             trimws(as.character(politician_info$Photo))
           } else NA_character_
           if (is.na(photo_url) || !startsWith(photo_url, "http")) stop("no URL")
-          tmp <- tempfile(fileext = ".jpg")
-          dl_status <- download.file(photo_url, tmp, quiet = TRUE, mode = "wb")
-          if (dl_status != 0 || !file.exists(tmp) || file.info(tmp)$size < 100L) {
-            stop("download failed")
+
+          # Photo URLs end in a numeric id (e.g. .../mepphoto/125670.jpg).
+          # Strip anything else so nothing can escape the cache directory.
+          fname  <- gsub("[^A-Za-z0-9._-]", "", basename(photo_url))
+          if (!nzchar(fname)) stop("bad file name")
+          fpath  <- file.path(.photo_dir, fname)
+
+          if (!file.exists(fpath) || file.info(fpath)$size < 100L) {
+            # Cap the wait — R is single-threaded, so one slow europarl.eu
+            # response would otherwise block every visitor for up to 60s
+            old_timeout <- options(timeout = 10)
+            on.exit(options(old_timeout), add = TRUE)
+            tmp <- tempfile(fileext = ".jpg")
+            dl_status <- download.file(photo_url, tmp, quiet = TRUE, mode = "wb")
+            if (dl_status != 0 || !file.exists(tmp) || file.info(tmp)$size < 100L) {
+              stop("download failed")
+            }
+            file.rename(tmp, fpath)
           }
-          img_bytes <- readBin(tmp, "raw", n = file.info(tmp)$size)
-          unlink(tmp)
-          paste0("data:image/jpeg;base64,", jsonlite::base64_enc(img_bytes))
+          paste0("mepphotos/", fname)
         }, error = function(e) "placeholder-image.png")
 
         # Render the politician details in the sidebar
@@ -3154,6 +3468,8 @@ shinyServer(function(input, output, session) {
       datasets$umap_data <- umap_data
       selected_mapping("UMAP")
       clusteringCompleted(TRUE)
+      last_run$method <- "HDBSCAN"
+      last_run$param  <- best_defaults[[p]]$minPts
       return(invisible(TRUE))
     }
     # ── Slow path: compute HDBSCAN on the fly (precomp file missing) ───────────
@@ -3208,6 +3524,8 @@ shinyServer(function(input, output, session) {
     datasets$umap_data <- umap_data
     selected_mapping("UMAP")
     clusteringCompleted(TRUE)
+    last_run$method <- "HDBSCAN"
+    last_run$param  <- defs$minPts
     invisible(TRUE)
   }
 
@@ -3219,6 +3537,7 @@ shinyServer(function(input, output, session) {
     req(input$selectedP)
     clusteringCompleted(FALSE)
     clusterPlotObject(NULL)   # reset Step-4 plot when parliament switches
+    robust_results(NULL)      # reset robustness analysis when parliament switches
 
     # Reset all per-parliament derived state so that Step 3 exploration
     # (parliament hemicycle, boxplot, scatter plots) always uses the newly

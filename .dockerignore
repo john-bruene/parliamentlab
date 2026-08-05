@@ -17,6 +17,10 @@ fly.toml
 
 # Development-only scripts and notebooks not used by the running app
 archive
+ggparliament-master
+.claude
+profvis_report.html
+**/.DS_Store
 
 # Raw CSV sources — the app now reads the compact .rds versions
 data/*.csv

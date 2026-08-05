@@ -2,17 +2,29 @@
 
 # ParliamentLab
 
-Shiny app for exploring voting behavior in the European Parliament, written as part of a master's thesis on political group cohesion. It covers four legislative terms — EP6 through EP9 (2004–2024) — and walks through the full analysis pipeline: descriptive stats, feature engineering, dimensionality reduction (DW-NOMINATE, MCA, UMAP), and clustering (k-Means, HDBSCAN). Recommended clustering results load automatically on startup, so you can go straight to the exploration without clicking through everything first.
+Shiny app for exploring voting behavior in the European Parliament. It covers four legislative terms, EP6 through EP9 (2004-2022), and walks through a full analysis pipeline: data preparation, feature engineering, exploration, dimensionality reduction (W-NOMINATE, MCA, UMAP) and clustering (k-Means, PAM, HDBSCAN).
 
-Live version: https://masterthesis-eustat.fly.dev
+You do not have to work through the steps in order. Recommended clustering results load automatically on startup, so the exploration and results views are populated the moment the app opens.
 
-Also available on shinyapps.io: https://john-f-bruene.shinyapps.io/parliamentlab/
+Live version: https://parliamentlab.eu (also reachable at https://parliamentlab.com)
+
+---
+
+## What the app does
+
+The interface follows the shape of a research process, one tab per stage.
+
+1. **Introduction** frames the problem with the FiveThirtyEight analysis of US House voting that inspired it.
+2. **Data Preparation** merges the source datasets, handles missing values, and builds indices such as attendance, loyalty, activity and per-topic voting scores.
+3. **Exploration** compares those measures across political groups and countries, and includes an interactive hemicycle where clicking a seat opens that MEP's profile.
+4. **Clustering** applies dimensionality reduction and clustering, scores the result with silhouette, Davies-Bouldin and Calinski-Harabasz, and stress-tests it by re-running the clustering under different settings and on resampled data.
+5. **Results** summarises the clusters and compares them against the official political groups.
 
 ---
 
 ## Running locally
 
-Requires R ≥ 4.2 and RStudio. All data files are already in the repository, no separate download needed.
+Requires R version 4.2 or newer. All data files are already in the repository, so there is nothing to download separately.
 
 ```r
 # 1. install dependencies (first time only, takes a few minutes)
@@ -22,12 +34,49 @@ source("install_packages.R")
 shiny::runApp(".")
 ```
 
-Or open `masterthesis_EUStat.Rproj` in RStudio and click **Run App**.
+Or open `parliamentlab.Rproj` in RStudio and click **Run App**.
 
-On first startup the app computes HDBSCAN clustering for the selected parliament, which takes a few seconds. If you want to skip that, run `Rscript precompute_all.R` once beforehand — it pre-bakes the results and converts the data to a faster format. Not required, just a nice speedup.
+On first startup the app computes HDBSCAN clustering for the selected term, which takes a few seconds. Running `Rscript precompute_all.R` once beforehand bakes those results in and converts the data to a faster format. It is optional, just a speedup.
+
+To run it in a container instead, the `Dockerfile` builds a self-contained image and `fly.toml` holds the deployment configuration used for the live site.
+
+---
+
+## Repository layout
+
+| Path | What it is |
+| --- | --- |
+| `ui.R`, `server.R` | The application |
+| `R/parliament_local.R` | Local hemicycle layout, replaces the ggparliament dependency |
+| `data/` | Raw sources and the compact `.rds` files the app reads |
+| `www/` | Images, country flags and static assets |
+| `scripts/convert_data_to_rds.R` | Rebuilds the `.rds` files from the raw sources |
+| `precompute_all.R` | Optional precomputation of clustering results |
+| `install_packages.R` | Installs the R packages the app needs |
+| `benchmark.R`, `profile.R` | Development helpers for timing and profiling |
 
 ---
 
 ## Data
 
-Roll-call votes from ParlTrack / VoteWatch EU, covering roughly 3,700 MEPs across four terms. DW-NOMINATE ideal point estimates were produced with W-NOMINATE. The `data/` folder contains preprocessed `.rds` files with vote scores, UMAP embeddings, and biographical data — no raw vote matrices. The full methodology is in the thesis.
+Roll-call votes from Parltrack and VoteWatch Europe, covering roughly 3,700 MEPs across four terms. DW-NOMINATE ideal point estimates were produced with W-NOMINATE.
+
+The `data/` folder holds both the raw source tables (`*_umap_scores_red_NEW.csv` and `EP6_9_Voted_docs_new_datesfixed.xlsx`) and the compact `.rds` files the app actually reads. Each `P*_umap.rds` carries one row per MEP with the full roll-call vote matrix, about 13,500 vote columns for EP9, alongside the derived indices, UMAP embeddings and biographical fields. `scripts/convert_data_to_rds.R` regenerates the `.rds` files from the raw sources.
+
+VoteWatch Europe shut down in 2022, so the raw files are kept in the repository rather than linked, to keep the analysis reproducible.
+
+---
+
+## Citation
+
+The app is described in the companion article:
+
+> Brüne, J. F., Potts, S. and Bergherr, E. *ParliamentLab: An Interactive Application for Exploring Voting Behavior in the European Parliament*.
+
+The full methodology, including how the indices are defined, is described there.
+
+---
+
+## License
+
+The code is released under the [MIT License](LICENSE). The bundled data comes from public sources with their own terms: Parltrack publishes under the Open Database License (ODbL), and the VoteWatch Europe data is used for research purposes.

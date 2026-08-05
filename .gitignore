@@ -1,8 +1,32 @@
+# macOS / editor noise
+.DS_Store
+
+# RStudio / R session state
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
 .positai
+
+# AI assistant working files (session logs, worktrees, local launch config)
+.claude/
+
+# Deployment metadata tied to a personal shinyapps.io account
+rsconnect/
+
+# Superseded exploratory scripts and intermediate results, kept locally only
+archive/
+
+# www assets no longer used by the app, kept locally only
+www/DALLE.webp
+www/HS118_members.csv
+www/arrow_general.png
+www/cluster_example.png
+www/dark-mode.css
+www/qqNorm.png
+www/plots/
+
+# Local dev scratch
 ggparliament-master
 diagnose.log
 diagnose.sh
