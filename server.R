@@ -3406,9 +3406,11 @@ shinyServer(function(input, output, session) {
           NULL
         }
 
-        # Fetch the MEP photo server-side once, then hand the browser a normal
-        # same-origin URL (see .photo_dir above). Fetching server-side is still
-        # needed because RStudio's viewer blocks direct external image URLs.
+        # MEP portraits ship with the app in www/mep_photos/, put there once by
+        # scripts/download_photos.R. That keeps the app off the network at
+        # runtime, which matters because a dropped request used to cost the
+        # user the portrait. Anything not prefetched (a newly added MEP, say)
+        # still falls back to fetching it once into the temp cache.
         photo_src <- tryCatch({
           photo_url <- if ("Photo" %in% colnames(politician_info) &&
                            !is.na(politician_info$Photo) &&
@@ -3418,21 +3420,26 @@ shinyServer(function(input, output, session) {
           if (is.na(photo_url) || !startsWith(photo_url, "http")) stop("no URL")
 
           # Photo URLs end in a numeric id (e.g. .../mepphoto/125670.jpg).
-          # Strip anything else so nothing can escape the cache directory.
+          # Strip anything else so nothing can escape the photo directories.
           fname  <- gsub("[^A-Za-z0-9._-]", "", basename(photo_url))
           if (!nzchar(fname)) stop("bad file name")
-          fpath  <- file.path(.photo_dir, fname)
 
-          if (!file.exists(fpath) || file.info(fpath)$size < 100L) {
-            # Cap the wait — R is single-threaded, so one slow europarl.eu
-            # response would otherwise block every visitor for up to 60s
-            old_timeout <- options(timeout = 10)
-            on.exit(options(old_timeout), add = TRUE)
-            tmp <- tempfile(fileext = ".jpg")
-            .download_photo(photo_url, tmp)
-            file.rename(tmp, fpath)
+          bundled <- file.path("www", "mep_photos", fname)
+          if (file.exists(bundled) && file.info(bundled)$size >= 100L) {
+            paste0("mep_photos/", fname)     # served straight out of www/
+          } else {
+            fpath <- file.path(.photo_dir, fname)
+            if (!file.exists(fpath) || file.info(fpath)$size < 100L) {
+              # Cap the wait — R is single-threaded, so one slow europarl.eu
+              # response would otherwise block every visitor for up to 60s
+              old_timeout <- options(timeout = 10)
+              on.exit(options(old_timeout), add = TRUE)
+              tmp <- tempfile(fileext = ".jpg")
+              .download_photo(photo_url, tmp)
+              file.rename(tmp, fpath)
+            }
+            paste0("mepphotos/", fname)
           }
-          paste0("mepphotos/", fname)
         }, error = function(e) {
           # Say why on the console instead of failing silently, and return NULL
           # so the UI shows a plain "no photo" box rather than a broken image.

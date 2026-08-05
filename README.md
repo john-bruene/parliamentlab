@@ -51,6 +51,7 @@ To run it in a container instead, the `Dockerfile` builds a self-contained image
 | `data/` | Raw sources and the compact `.rds` files the app reads |
 | `www/` | Images, country flags and static assets |
 | `scripts/convert_data_to_rds.R` | Rebuilds the `.rds` files from the raw sources |
+| `scripts/download_photos.R` | Prefetches MEP portraits into `www/mep_photos/` |
 | `precompute_all.R` | Optional precomputation of clustering results |
 | `install_packages.R` | Installs the R packages the app needs |
 | `benchmark.R`, `profile.R` | Development helpers for timing and profiling |
@@ -64,6 +65,8 @@ Roll-call votes from Parltrack and VoteWatch Europe, covering roughly 3,700 MEPs
 The `data/` folder holds both the raw source tables (`*_umap_scores_red_NEW.csv` and `EP6_9_Voted_docs_new_datesfixed.xlsx`) and the compact `.rds` files the app actually reads. Each `P*_umap.rds` carries one row per MEP with the full roll-call vote matrix, about 13,500 vote columns for EP9, alongside the derived indices, UMAP embeddings and biographical fields. `scripts/convert_data_to_rds.R` regenerates the `.rds` files from the raw sources.
 
 VoteWatch Europe shut down in 2022, so the raw files are kept in the repository rather than linked, to keep the analysis reproducible.
+
+MEP portraits live in `www/mep_photos/`, fetched once from the European Parliament's public photo service by `scripts/download_photos.R` and downscaled to sidebar size. Shipping them means the running app never depends on an external request, which used to leave the odd portrait blank whenever a request was dropped. Re-run that script after adding a legislature; it skips photos already on disk.
 
 ---
 
@@ -80,3 +83,5 @@ The full methodology, including how the indices are defined, is described there.
 ## License
 
 The code is released under the [MIT License](LICENSE). The bundled data comes from public sources with their own terms: Parltrack publishes under the Open Database License (ODbL), and the VoteWatch Europe data is used for research purposes.
+
+MEP portraits in `www/mep_photos/` come from the European Parliament's public photo service (© European Union). They are included for educational and research use; `scripts/download_photos.R` can regenerate them from source.
