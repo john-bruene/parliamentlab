@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>ParliamentLab: voting behavior in the European Parliament, 2004 to 2022</title>
+<meta name="description" content="ParliamentLab is an interactive application for exploring roll-call votes in the European Parliament from 2004 to 2022. Four legislative terms, roughly 3,700 MEPs. Free and open source, no programming required.">
+<link rel="canonical" href="https://parliamentlab.eu/">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://parliamentlab.eu/">
+<meta property="og:site_name" content="ParliamentLab">
+<meta property="og:title" content="ParliamentLab.eu">
+<meta property="og:description" content="Voting behavior in the European Parliament, 2004 to 2022.">
+<meta property="og:image" content="https://parliamentlab.eu/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+<style>
+  @font-face{
+    font-family:"EB Garamond";
+    src:url("fonts/eb-garamond-v30-latin-regular.woff2") format("woff2");
+    font-weight:400; font-style:normal; font-display:swap;
+  }
+  :root{
+    --navy:#17356B; --blue:#1B4FC0; --btn:#1E3A8A; --btn-dark:#16307A;
+    --grey:#566173; --faint:#6B7688; --line:#D3DCEC; --edge:#DCE3F0;
+    --mx:62%; --my:24%;
+    --serif:"EB Garamond","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:#F7F9FC; color:var(--navy); font-family:var(--sans);
+       -webkit-font-smoothing:antialiased;
+       min-height:100vh; display:flex; align-items:center; justify-content:center;
+       padding:56px 28px}
+  #wash{position:fixed; inset:0; z-index:0; pointer-events:none;
+        background:
+          radial-gradient(680px circle at var(--mx) var(--my), rgba(155,185,240,.55), transparent 66%),
+          radial-gradient(520px circle at calc(var(--mx) - 260px) calc(var(--my) + 220px), rgba(196,214,246,.45), transparent 68%);}
+  main{position:relative; z-index:1; width:100%; max-width:700px; text-align:center}
+
+  h1{font-family:var(--serif); font-size:clamp(42px,8.4vw,64px); font-weight:400;
+     letter-spacing:-.012em; line-height:1.04; margin:0 0 16px; color:var(--navy)}
+  h1 .lab{color:var(--blue)}
+  h1 .tld{color:#8A9BBE}
+  .deck{font-family:var(--serif); font-size:clamp(16px,2.8vw,20px); line-height:1.45;
+        color:var(--grey); margin:0 0 clamp(38px,7vh,64px)}
+
+  .cta{display:block; width:100%; max-width:440px; margin:0 auto 14px;
+       background:var(--btn); color:#fff; text-decoration:none; border-radius:6px;
+       padding:22px 24px; font-size:clamp(18px,2.9vw,22px); line-height:1.3;
+       transition:background .15s ease}
+  .cta small{display:block; font-size:clamp(12.5px,1.7vw,14px); color:#B9C7EA; margin-top:6px}
+  .cta:hover{background:#16307A}
+
+  .row{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;
+       max-width:640px; margin:0 auto}
+  .row a{display:flex; align-items:center; justify-content:center; gap:9px;
+         background:rgba(255,255,255,.82); border:1px solid var(--edge);
+         border-radius:6px; color:#1A2740; text-decoration:none;
+         padding:15px 10px; font-size:clamp(13px,1.9vw,15px); line-height:1.3;
+         transition:border-color .15s ease, background .15s ease}
+  .row a:hover{background:#fff; border-color:var(--blue)}
+  .row svg{width:17px; height:17px; fill:var(--blue); flex:none}
+
+  .cta:focus-visible,.row a:focus-visible{outline:3px solid var(--navy); outline-offset:3px}
+
+  @media (max-width:560px){
+    .row{grid-template-columns:1fr}
+    body{padding:40px 22px}
+  }
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important} }
+</style>
+</head>
+
+<body>
+<div id="wash" aria-hidden="true"></div>
+
+<main>
+
+  <h1>Parliament<span class="lab">Lab</span><span class="tld">.eu</span></h1>
+
+  <p class="deck">Voting behavior in the European Parliament, 2004 to 2022</p>
+
+  <a class="cta" href="https://parliamentlab.eu/app">
+    Open the application
+    <small>hosted online, nothing to install</small>
+  </a>
+
+  <nav class="row" aria-label="Project resources">
+    <a href="https://doi.org/10.1017/S1682098326100629">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l6 6v14H6zm7 1.5V9h5.5z"/></svg>
+      Read the paper
+    </a>
+    <a href="https://github.com/john-bruene/parliamentlab">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5C5.7.5.6 5.6.6 11.9c0 5 3.3 9.3 7.8 10.8.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.8 2.7 1.3 3.4 1 .1-.7.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.9 1.2 1.9 1.2 3.2 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6a11.4 11.4 0 0 0 7.8-10.8C23.4 5.6 18.3.5 12 .5z"/></svg>
+      Run it locally
+    </a>
+    <a href="https://doi.org/10.5281/zenodo.PLACEHOLDER">
+      <svg id="zenodo-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.7 22.4 7.6v8.8L12 22.3 1.6 16.4V7.6zm0 2.3L3.6 8.8v6.4L12 20l8.4-4.8V8.8zm-4 4.4h8v1.7l-4.9 4.3H16v1.8H8v-1.7l4.9-4.3H8z"/></svg>
+      Archived release
+    </a>
+  </nav>
+
+</main>
+
+<script>
+(function () {
+  var wash = document.getElementById('wash');
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var w = innerWidth, h = innerHeight;
+  var tx = w * .62, ty = h * .24, cx = tx, cy = ty, pointer = false, raf;
+
+  addEventListener('resize', function () { w = innerWidth; h = innerHeight; });
+  addEventListener('pointermove', function (e) {
+    tx = e.clientX; ty = e.clientY; pointer = true;
+  }, { passive: true });
+
+  function paint() {
+    wash.style.setProperty('--mx', cx.toFixed(1) + 'px');
+    wash.style.setProperty('--my', cy.toFixed(1) + 'px');
+  }
+  if (reduce) { paint(); return; }
+
+  function loop() {
+    if (!pointer) {
+      var t = Date.now() / 3400;
+      tx = w * .62 + Math.cos(t) * w * .14;
+      ty = h * .24 + Math.sin(t * 1.3) * h * .09;
+    }
+    cx += (tx - cx) * .07; cy += (ty - cy) * .07;
+    paint();
+    raf = requestAnimationFrame(loop);
+  }
+  loop();
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) cancelAnimationFrame(raf); else loop();
+  });
+})();
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ParliamentLab",
+  "url": "https://parliamentlab.eu/",
+  "applicationCategory": "https://schema.org/ResearchApplication",
+  "operatingSystem": "Web browser",
+  "description": "Interactive application and structured dataset for exploring roll-call votes in the European Parliament from 2004 to 2022, covering four legislative terms and roughly 3,700 MEPs.",
+  "license": "https://opensource.org/licenses/MIT",
+  "codeRepository": "https://github.com/john-bruene/parliamentlab",
+  "isAccessibleForFree": true,
+  "inLanguage": "en",
+  "author": [
+    { "@type": "Person", "name": "John Frederic Brüne",
+      "affiliation": [
+        { "@type": "Organization", "name": "University of Bologna" },
+        { "@type": "Organization", "name": "University of Göttingen" } ] },
+    { "@type": "Person", "name": "Sophie Potts",
+      "affiliation": { "@type": "Organization", "name": "University of Göttingen" } },
+    { "@type": "Person", "name": "Elisabeth Bergherr",
+      "affiliation": { "@type": "Organization", "name": "University of Göttingen" } }
+  ],
+  "citation": {
+    "@type": "ScholarlyArticle",
+    "name": "ParliamentLab: An interactive application for exploring voting behavior in the European Parliament",
+    "identifier": "https://doi.org/10.1017/S1682098326100629",
+    "sameAs": "https://doi.org/10.1017/S1682098326100629",
+    "isPartOf": { "@type": "Periodical", "name": "European Political Science" },
+    "datePublished": "2026"
+  }
+}
+</script>
+</body>
+</html>
