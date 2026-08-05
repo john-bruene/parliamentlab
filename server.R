@@ -80,6 +80,28 @@ five_thirty <- read.csv("www/clustered_congress.csv")
 dir.create(.photo_dir, showWarnings = FALSE, recursive = TRUE)
 shiny::addResourcePath("mepphotos", .photo_dir)
 
+# Download one photo to `dest`. europarl.eu drops the odd request, and a single
+# dropped request used to cost the user the portrait entirely, so try twice
+# before giving up. download.file() signals some failures as warnings rather
+# than errors, hence catching both. On failure the message says what actually
+# went wrong instead of a bare "download failed".
+.download_photo <- function(url, dest) {
+  attempt <- function() tryCatch(
+    list(status = download.file(url, dest, quiet = TRUE, mode = "wb"), msg = ""),
+    error   = function(e) list(status = -1L, msg = conditionMessage(e)),
+    warning = function(w) list(status = -1L, msg = conditionMessage(w))
+  )
+  usable <- function() file.exists(dest) && file.info(dest)$size >= 100L
+
+  res <- attempt()
+  if (!identical(as.integer(res$status), 0L) || !usable()) {
+    Sys.sleep(0.4)
+    res <- attempt()
+  }
+  if (identical(as.integer(res$status), 0L) && usable()) return(invisible(TRUE))
+  stop("download failed (", if (nzchar(res$msg)) res$msg else paste("status", res$status), ")")
+}
+
 load_parl <- function(p) {
   if (is.null(.data_cache[[p]])) {
     qs_path <- paste0("data/", p, "_umap.qs")
@@ -3407,25 +3429,32 @@ shinyServer(function(input, output, session) {
             old_timeout <- options(timeout = 10)
             on.exit(options(old_timeout), add = TRUE)
             tmp <- tempfile(fileext = ".jpg")
-            dl_status <- download.file(photo_url, tmp, quiet = TRUE, mode = "wb")
-            if (dl_status != 0 || !file.exists(tmp) || file.info(tmp)$size < 100L) {
-              stop("download failed")
-            }
+            .download_photo(photo_url, tmp)
             file.rename(tmp, fpath)
           }
           paste0("mepphotos/", fname)
-        }, error = function(e) "placeholder-image.png")
+        }, error = function(e) {
+          # Say why on the console instead of failing silently, and return NULL
+          # so the UI shows a plain "no photo" box rather than a broken image.
+          message("[photo] ", politician_info$Name[1], ": ", conditionMessage(e))
+          NULL
+        })
 
         # Render the politician details in the sidebar
         output$politicianDetails <- renderUI({
           tagList(
             tags$h4(politician_info$Name),
-            tags$img(
-              src     = photo_src,
-              width   = "60%",
-              height  = "auto",
-              onerror = "this.onerror=null;this.src='placeholder-image.png';"
-            ),
+            if (!is.null(photo_src)) {
+              tags$img(src = photo_src, width = "60%", height = "auto", alt = "")
+            } else {
+              # Self-contained fallback: no image file needed
+              tags$div(
+                style = "width:60%; aspect-ratio:4/5; display:flex; align-items:center;
+                         justify-content:center; background:#f0f0f0; border:1px solid #ddd;
+                         border-radius:4px; color:#888; font-size:13px; text-align:center;",
+                "No photo available"
+              )
+            },
             tags$p(strong("EPG:"), politician_info$EPG),
             tags$p(
               strong("Country:"),
@@ -3589,9 +3618,7 @@ shinyServer(function(input, output, session) {
                          class = "btn btn-primary btn-lg",
                          icon = icon("bolt"))
           ),
-          br(),
-          tags$img(src = "placeholder-image.png", width = "500px",
-                   height = "auto", style = "border:2px solid #ccc; opacity:0.6;")
+          br()
         )
       )
     } else {
