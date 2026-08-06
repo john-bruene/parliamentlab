@@ -1,6 +1,6 @@
-<img src="parliamentlab_hex.png" align="right" height="110"/>
-
 # ParliamentLab
+
+<img src="www/parliamentlab_hex.png" align="right" width="135" alt="ParliamentLab hex sticker"/>
 
 Shiny app for exploring voting behavior in the European Parliament. It covers four legislative terms, EP6 through EP9 (2004-2022), and walks through a full analysis pipeline: data preparation, feature engineering, exploration, dimensionality reduction (W-NOMINATE, MCA, UMAP) and clustering (k-Means, PAM, HDBSCAN).
 
@@ -28,7 +28,7 @@ Requires R version 4.2 or newer. All data files are already in the repository, s
 
 ```r
 # 1. install dependencies (first time only, takes a few minutes)
-source("install_packages.R")
+source("scripts/install_packages.R")
 
 # 2. launch
 shiny::runApp(".")
@@ -36,9 +36,9 @@ shiny::runApp(".")
 
 Or open `parliamentlab.Rproj` in RStudio and click **Run App**.
 
-On first startup the app computes HDBSCAN clustering for the selected term, which takes a few seconds. Running `Rscript precompute_all.R` once beforehand bakes those results in and converts the data to a faster format. It is optional, just a speedup.
+Recommended clustering results ship with the repository, so the app is ready to use straight away. Running `Rscript scripts/precompute_all.R` once beforehand additionally converts the data to a faster format. It is optional, just a speedup.
 
-To run it in a container instead, the `Dockerfile` builds a self-contained image and `fly.toml` holds the deployment configuration used for the live site.
+To run it in a container instead, the `Dockerfile` builds a self-contained image.
 
 ---
 
@@ -50,11 +50,12 @@ To run it in a container instead, the `Dockerfile` builds a self-contained image
 | `R/parliament_local.R` | Local hemicycle layout, replaces the ggparliament dependency |
 | `data/` | Raw sources and the compact `.rds` files the app reads |
 | `www/` | Images, country flags and static assets |
+| `docs/` | The landing page served at parliamentlab.eu via GitHub Pages |
+| `scripts/install_packages.R` | Installs the R packages the app needs |
 | `scripts/convert_data_to_rds.R` | Rebuilds the `.rds` files from the raw sources |
 | `scripts/download_photos.R` | Prefetches MEP portraits into `www/mep_photos/` |
-| `precompute_all.R` | Optional precomputation of clustering results |
-| `install_packages.R` | Installs the R packages the app needs |
-| `benchmark.R`, `profile.R` | Development helpers for timing and profiling |
+| `scripts/precompute_all.R` | Optional precomputation of clustering results |
+| `scripts/benchmark.R`, `scripts/profile.R` | Development helpers for timing and profiling |
 
 ---
 
@@ -74,9 +75,9 @@ MEP portraits live in `www/mep_photos/`, fetched once from the European Parliame
 
 The app is described in the companion article:
 
-> Brüne, J. F., Potts, S. and Bergherr, E. *ParliamentLab: An Interactive Application for Exploring Voting Behavior in the European Parliament*.
+> Brüne, J. F., Potts, S. and Bergherr, E. (2026). ParliamentLab: An interactive application for exploring voting behavior in the European Parliament. *European Political Science*. [doi:10.1017/S1682098326100629](https://doi.org/10.1017/S1682098326100629)
 
-The full methodology, including how the indices are defined, is described there.
+The article is open access under CC BY 4.0. The full methodology, including how the indices are defined, is described there.
 
 ---
 

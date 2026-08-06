@@ -42,7 +42,7 @@ COPY . /srv/shiny-server/
 
 # Precompute: convert .rds → .qs (faster I/O) and bake in HDBSCAN cluster
 # assignments so that do_load_best() never has to run HDBSCAN at session start.
-RUN cd /srv/shiny-server && Rscript precompute_all.R
+RUN cd /srv/shiny-server && Rscript scripts/precompute_all.R
 
 # Exponiere den Standardport für Shiny (3838)
 EXPOSE 3838

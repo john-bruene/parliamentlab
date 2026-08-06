@@ -13,7 +13,9 @@
 
 # Publish / deployment metadata
 rsconnect
-fly.toml
+
+# Landing page, served by GitHub Pages and not needed inside the image
+docs
 
 # Development-only scripts and notebooks not used by the running app
 archive
