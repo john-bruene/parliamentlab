@@ -39,7 +39,12 @@ shinyUI(fluidPage(
               content = "An interactive application for exploring voting behavior in the European Parliament."),
     tags$meta(property = "og:type", content = "website"),
     tags$meta(property = "og:url", content = "https://parliamentlab.eu"),
+    # Served from the landing page repo (docs/), not from this app, so the
+    # preview keeps working whenever the app moves to a different host.
     tags$meta(property = "og:image", content = "https://parliamentlab.eu/parliamentlab_hex.png"),
+    tags$meta(property = "og:image:width", content = "736"),
+    tags$meta(property = "og:image:height", content = "752"),
+    tags$meta(property = "og:image:alt", content = "ParliamentLab hex sticker"),
     tags$meta(name = "twitter:card", content = "summary")
   ),
 
