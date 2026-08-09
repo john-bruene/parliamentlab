@@ -79,6 +79,8 @@ The app is described in the companion article:
 
 The article is open access under CC BY 4.0. The full methodology, including how the indices are defined, is described there.
 
+The software itself is archived on Zenodo: [doi:10.5281/zenodo.21863149](https://doi.org/10.5281/zenodo.21863149). That DOI always resolves to the latest release; `v1.0.0` specifically is [doi:10.5281/zenodo.21863150](https://doi.org/10.5281/zenodo.21863150).
+
 ---
 
 ## License

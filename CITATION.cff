@@ -14,6 +14,16 @@ authors:
     affiliation: "University of Göttingen"
 repository-code: "https://github.com/john-bruene/parliamentlab"
 url: "https://parliamentlab.eu"
+version: "1.0.0"
+date-released: "2026-08-09"
+doi: "10.5281/zenodo.21863149"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21863149"
+    description: "Concept DOI, always resolves to the latest version"
+  - type: doi
+    value: "10.5281/zenodo.21863150"
+    description: "DOI of version v1.0.0"
 abstract: >-
   An interactive Shiny application and structured dataset for exploring
   roll-call voting behavior in the European Parliament from 2004 to 2022,
