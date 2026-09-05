@@ -154,6 +154,8 @@ shinyServer(function(input, output, session) {
               umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.820),
     P9 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 7,
               umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.811),
+    P9full = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 12,
+                  umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.842),
     P10 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 10,
                umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.778)
   )
@@ -299,6 +301,19 @@ shinyServer(function(input, output, session) {
         "NI" = 8,
         "Non-attached Members" = 9
       ),
+      # EP9 over its full term. Same left-right sequence as the published P9
+      # block above, but with the long group names the API returns, so the
+      # 2022-2024 half lines up with the 2019-2022 half.
+      "P9full" = c(
+        "The Left group in the European Parliament - GUE/NGL" = 1,
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = 2,
+        "Group of the Greens/European Free Alliance" = 3,
+        "Renew Europe Group" = 4,
+        "Group of the European People's Party (Christian Democrats)" = 5,
+        "European Conservatives and Reformists Group" = 6,
+        "Identity and Democracy Group" = 7,
+        "Non-attached Members" = 8
+      ),
       # EP10 uses the Parliament's own long group names (the API returns those,
       # matching P6-P8; P9 above is the odd one out with short codes). The
       # order follows the mean W-NOMINATE position measured for this term.
@@ -359,6 +374,16 @@ shinyServer(function(input, output, session) {
         "IDG" = "purple",
         "Non-attached Members" = "lightblue"
       ),
+      "P9full" = c(
+        "Group of the European People's Party (Christian Democrats)" = "blue",
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = "red",
+        "Renew Europe Group" = "gold",
+        "Group of the Greens/European Free Alliance" = "green",
+        "European Conservatives and Reformists Group" = "darkblue",
+        "The Left group in the European Parliament - GUE/NGL" = "darkred",
+        "Identity and Democracy Group" = "purple",
+        "Non-attached Members" = "grey"
+      ),
       "P10" = c(
         "Group of the European People's Party (Christian Democrats)" = "blue",
         "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = "red",
@@ -414,6 +439,16 @@ shinyServer(function(input, output, session) {
         "ECR" = "ECR",
         "IDG" = "ID",
         "NI" = "Non-attached",
+        "Non-attached Members" = "Non-attached"
+      ),
+      "P9full" = c(
+        "The Left group in the European Parliament - GUE/NGL" = "The Left",
+        "Group of the Greens/European Free Alliance" = "Greens/EFA",
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = "Socialists & Democrats",
+        "Renew Europe Group" = "Renew Europe",
+        "Group of the European People's Party (Christian Democrats)" = "EPP",
+        "European Conservatives and Reformists Group" = "ECR",
+        "Identity and Democracy Group" = "ID",
         "Non-attached Members" = "Non-attached"
       ),
       "P10" = c(
@@ -1574,7 +1609,7 @@ shinyServer(function(input, output, session) {
       
       # Prepare data
       data <- data_react()
-      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P10" = 10)
+      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P9full" = 9, "P10" = 10)
       
       # Filter data based on selected Parliament and relevant votes
       relevant_votes <- load_voted() %>%
@@ -1705,7 +1740,7 @@ shinyServer(function(input, output, session) {
     # Schritt 1: Extract Vote_ID from variable_contributions$Variable
     variable_contributions <- datasets$variable_contributions
     
-    legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P10" = 10)
+    legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P9full" = 9, "P10" = 10)
     
     # Filter data based on selected Parliament and relevant votes
     EP6_9 <- load_voted() %>%
@@ -1775,7 +1810,7 @@ shinyServer(function(input, output, session) {
       
       # Prepare data
       data <- data_react()
-      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P10" = 10)
+      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P9full" = 9, "P10" = 10)
       
       # Filter data based on selected Parliament and relevant votes
       relevant_votes <- load_voted() %>%
@@ -3790,17 +3825,25 @@ shinyServer(function(input, output, session) {
   
   
   # Human-readable label for the global legislature selector display
+  # Keep these in step with the choices in ui.R's selectedP selector.
   .period_labels <- c(
-    P6 = "6th Parliament (2004–2009)",
-    P7 = "7th Parliament (2009–2014)",
-    P8 = "8th Parliament (2014–2019)",
-    P9 = "9th Parliament (2019–2024)"
+    P6     = "6th Parliament (2004–2009)",
+    P7     = "7th Parliament (2009–2014)",
+    P8     = "8th Parliament (2014–2019)",
+    P9     = "9th Parliament (2019–2022, as published)",
+    P9full = "9th Parliament (2019–2024, full term)",
+    P10    = "10th Parliament (2024–2026)"
   )
+  .period_label <- function(p) {
+    # single-bracket lookup: an unknown key yields NA rather than an error
+    lbl <- unname(.period_labels[p %||% "P9"])
+    if (length(lbl) != 1L || is.na(lbl)) "European Parliament" else lbl
+  }
   output$selected_period_label <- renderText({
-    .period_labels[input$selectedP %||% "P9"]
+    .period_label(input$selectedP)
   })
   output$selected_period_label2 <- renderText({
-    .period_labels[input$selectedP %||% "P9"]
+    .period_label(input$selectedP)
   })
 
   output$dynamicTitle <- renderUI({
@@ -3819,10 +3862,13 @@ shinyServer(function(input, output, session) {
     # Convert parliament_period from "P6", "P7", etc., to "6th", "7th", etc.
     parliament_period <- switch(
       input$selectedP,
-      "P6" = "6th European Parliament",
-      "P7" = "7th European Parliament",
-      "P8" = "8th European Parliament",
-      "P9" = "9th European Parliament"
+      "P6"     = "6th European Parliament",
+      "P7"     = "7th European Parliament",
+      "P8"     = "8th European Parliament",
+      "P9"     = "9th European Parliament",
+      "P9full" = "9th European Parliament, full term",
+      "P10"    = "10th European Parliament",
+      "European Parliament"   # fallback, so the headline never ends mid-sentence
     )
     
     h2(

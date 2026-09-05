@@ -33,7 +33,7 @@ shinyUI(fluidPage(
     # Meta description and social preview cards (used when the link is
     # shared on social media, in chat apps, or indexed by search engines)
     tags$meta(name = "description",
-              content = "Explore how Members of the European Parliament actually vote: interactive charts, maps and clustering across four legislative terms, 2004 to 2022."),
+              content = "Explore how Members of the European Parliament actually vote: interactive charts, maps and clustering across five legislative terms, 2004 to 2026."),
     tags$meta(property = "og:title", content = "ParliamentLab"),
     tags$meta(property = "og:description",
               content = "An interactive application for exploring voting behavior in the European Parliament."),
@@ -105,7 +105,8 @@ shinyUI(fluidPage(
                   "6th Parliament (2004–2009)" = "P6",
                   "7th Parliament (2009–2014)" = "P7",
                   "8th Parliament (2014–2019)" = "P8",
-                  "9th Parliament (2019–2022)" = "P9",
+                  "9th Parliament (2019–2022, as published)" = "P9",
+                  "9th Parliament (2019–2024, full term)" = "P9full",
                   "10th Parliament (2024–2026)" = "P10"
                 ),
                 selected = "P9",
@@ -134,7 +135,7 @@ shinyUI(fluidPage(
                                    br(),
                                    
                                    p("The data used in this application are publicly accessible through the", em("VoteWatch Europe"), "and", em("PollTrack.eu"), "databases. 
-    These data sources contain voting records and biographical information for MEPs, covering multiple EU legislative sessions from 2004 to 2022. 
+    These data sources contain voting records and biographical information for MEPs, covering multiple EU legislative sessions from 2004 to 2026. 
     By leveraging this comprehensive dataset, you can gain insights into how political groups, alliances, and individual MEPs align on critical issues across 
     different policy areas, including economics, foreign policy, social issues, and more.", 
                                      style="text-align:justify;color:black;background-color:papayawhip;padding:15px;border-radius:10px"),

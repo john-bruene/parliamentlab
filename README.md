@@ -2,7 +2,7 @@
 
 <img src="www/parliamentlab_hex.png" alt="ParliamentLab hex sticker" align="right" width="135"/>
 
-Shiny app for exploring voting behavior in the European Parliament. It covers five legislative terms, EP6 through EP10 (2004-2026), and walks through a full analysis pipeline: data preparation, feature engineering, exploration, dimensionality reduction (W-NOMINATE, MCA, UMAP) and clustering (k-Means, PAM, HDBSCAN).
+Shiny app for exploring voting behavior in the European Parliament. It covers EP6 through EP10 (2004-2026), with the 9th Parliament available both as published (to 2022) and over its full term (to 2024), and walks through a full analysis pipeline: data preparation, feature engineering, exploration, dimensionality reduction (W-NOMINATE, MCA, UMAP) and clustering (k-Means, PAM, HDBSCAN).
 
 You do not have to work through the steps in order. Recommended clustering results load automatically on startup, so the exploration and results views are populated the moment the app opens.
 
@@ -86,6 +86,7 @@ absent.
 | `scripts/convert_data_to_rds.R` | Rebuilds the `.rds` files from the raw sources |
 | `scripts/download_photos.R` | Prefetches MEP portraits into `www/mep_photos/` |
 | `scripts/scrape/run_all.R` | Runs the whole data-extension pipeline in order |
+| `scripts/scrape/build_p9full.R` | Joins published EP9 with the 2022-2024 remainder |
 | `scripts/scrape/build_p10.R` | Assembles `data/P10_umap.rds` in the app's schema |
 | `scripts/scrape/fill_birthdates.R` | Fills missing MEP birth dates from Wikidata |
 | `scripts/scrape/` | The individual stages (votes from the EP API; activity, policy area and topic scores via Parltrack) |
@@ -98,11 +99,46 @@ absent.
 
 ## Data
 
-Roll-call votes from Parltrack, VoteWatch Europe and the European Parliament's open data API, covering roughly 4,400 MEPs across five terms. DW-NOMINATE ideal point estimates were produced with W-NOMINATE.
+Roll-call votes from Parltrack, VoteWatch Europe and the European Parliament's open data API: 2,785 distinct MEPs across five terms, 2004 to 2026, and about 48,000 roll-calls. The per-term row counts add up to more than that because most members serve more than one term. DW-NOMINATE ideal point estimates were produced with W-NOMINATE.
 
 The `data/` folder holds both the raw source tables (`*_umap_scores_red_NEW.csv` and `EP6_9_Voted_docs_new_datesfixed.xlsx`) and the compact `.rds` files the app actually reads. Each `P*_umap.rds` carries one row per MEP with the full roll-call vote matrix, about 13,500 vote columns for EP9, alongside the derived indices, UMAP embeddings and biographical fields. `scripts/convert_data_to_rds.R` regenerates the `.rds` files from the raw sources.
 
 VoteWatch Europe shut down in 2022, so the raw files are kept in the repository rather than linked, to keep the analysis reproducible.
+
+The 9th Parliament appears twice in the selector, on purpose:
+
+- **2019-2022, as published** is `data/P9_umap.rds`, untouched. It is what the
+  companion article describes, so its figures stay reproducible.
+- **2019-2024, full term** is `data/P9full_umap.rds`, built by
+  `scripts/scrape/build_p9full.R`. It joins the published records to the
+  2022-2024 remainder scraped from the API: 873 MEPs and 19,265 roll-calls
+  against 811 and 13,459.
+
+The two halves join on the Parliament's person id, not on names: 696 of the
+758 scraped MEPs are already in the published file and 62 are replacements
+who took their seats after June 2022. Group names are harmonised to the long
+form the API returns, using a mapping read off the 696 MEPs present in both.
+For those 62 the API is the only source, so their country codes are translated
+from ISO-3166 alpha-3 to the full English names the rest of the app keys on,
+and their seniority is derived from their earlier term memberships rather than
+left at zero: 8 of them had served before.
+
+One caveat carries into the merged file. The published half distinguishes
+three kinds of absence (codes 4, 5 and 6), the API only reports "not in any
+voting list". Codes 5 and 6 are folded into 4 so that one convention applies
+across the term, which means attendance and loyalty in the full-term file are
+not directly comparable with the published columns. A second, smaller one: the
+live "re-run UMAP/MCA" buttons look votes up in `EP6_9_Voted.rds`, which only
+holds the published half, so those re-runs cover 2019-2022 even under the
+full-term selection. The precomputed results, which is what the app shows by
+default, use the whole term.
+
+The topic scores are recomputed over the whole term rather than carried over,
+so they differ from the published columns for two reasons at once: the second
+half rests on a reconstructed final-vote flag, and the block matching is
+case-insensitive, which picks up the labels the original missed (see *Topic
+scores* below). Read the two EP9 entries as separate views, not as one extended
+by the other.
 
 EP10 (2024-2026) is built from the European Parliament's own open data API by
 `scripts/scrape/`, then assembled into `data/P10_umap.rds` by
