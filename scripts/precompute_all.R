@@ -28,6 +28,7 @@ if (requireNamespace("qs", quietly = TRUE)) {
     "data/P7_umap.rds"       = "data/P7_umap.qs",
     "data/P8_umap.rds"       = "data/P8_umap.qs",
     "data/P9_umap.rds"       = "data/P9_umap.qs",
+    "data/P10_umap.rds"      = "data/P10_umap.qs",
     "data/EP6_9_Voted.rds"   = "data/EP6_9_Voted.qs"
   )
   for (src in names(rds_files)) {
@@ -51,7 +52,8 @@ best_defaults <- list(
   P6 = list(minPts = 25, umap_x = "UMAP1", umap_y = "UMAP2"),
   P7 = list(minPts = 25, umap_x = "UMAP1", umap_y = "UMAP2"),
   P8 = list(minPts = 20, umap_x = "UMAP1", umap_y = "UMAP2"),
-  P9 = list(minPts = 20, umap_x = "UMAP1", umap_y = "UMAP2")
+  P9 = list(minPts = 20, umap_x = "UMAP1", umap_y = "UMAP2"),
+  P10 = list(minPts = 20, umap_x = "UMAP1", umap_y = "UMAP2")
 )
 
 needed_base <- c(
@@ -63,7 +65,7 @@ needed_base <- c(
   "coord1D_red", "coord2D_red"
 )
 
-for (p in c("P6", "P7", "P8", "P9")) {
+for (p in c("P6", "P7", "P8", "P9", "P10")) {
   out_path <- sprintf("data/%s_best_clusters.rds", p)
   if (file.exists(out_path)) {
     cat(sprintf("[%s] %s already exists, skipping\n", p, out_path))

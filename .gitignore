@@ -32,3 +32,13 @@ diagnose.log
 diagnose.sh
 commit_fixes.sh
 profvis_report.html
+
+# EP API response cache and scrape output (regenerate with scripts/scrape/)
+data/api_cache/
+data/scraped/
+
+# Python bytecode from the scrape helpers
+__pycache__/
+
+# Working plan documents
+plan/

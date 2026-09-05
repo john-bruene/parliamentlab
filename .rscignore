@@ -31,3 +31,7 @@ www/cluster_example.png
 www/dark-mode.css
 www/qqNorm.png
 www/plots
+data/api_cache
+data/scraped
+tests
+renv.lock
