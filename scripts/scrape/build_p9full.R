@@ -209,8 +209,20 @@ if (file.exists(helper) && file.exists(dump)) {
     acts <- utils::read.csv(csv, stringsAsFactors = FALSE); unlink(csv)
     j <- match(as.integer(ids), acts$mep_id)
     for (cl in CATS) info[[cl]] <- ifelse(is.na(j), 0L, acts[[cl]][j])
-    cat(sprintf("activities: %d of %d MEPs have recorded activity\n",
-                sum(rowSums(info[CATS]) > 0), nrow(info)))
+    # The dump and the published counts do not agree: restricted to this term
+    # the dump credits 391 of the 811 published MEPs with nothing at all, and
+    # its totals correlate only 0.70 with the published ones even unwindowed,
+    # so the two were counted under different rules. Published values win
+    # wherever they exist, the same rule pick() applies to every other field;
+    # the dump then covers only the 62 replacements. Using the dump throughout
+    # would show half the chamber as entirely inactive.
+    for (cl in CATS) {
+      if (!cl %in% names(pub)) next
+      pv <- suppressWarnings(as.numeric(pub[[cl]]))[ip]
+      info[[cl]] <- ifelse(is.na(pv), info[[cl]], pv)
+    }
+    cat(sprintf("activities: %d of %d MEPs have recorded activity (%d taken from the published half)\n",
+                sum(rowSums(info[CATS]) > 0), nrow(info), sum(!is.na(ip))))
   }
 }
 for (cl in CATS) if (!cl %in% names(info)) info[[cl]] <- 0L

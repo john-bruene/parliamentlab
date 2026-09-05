@@ -193,9 +193,18 @@ for (leg in sort(unique(meta$Legislature))) {
   # is taken from the tally; that rule reproduces the official result_code on
   # 100% of the 13,459 original EP9 votes.
   adopted <- m_leg$yes > m_leg$no
+  # A few votes come back without a complete tally, so their outcome cannot be
+  # derived. Those columns say nothing about who sided with the majority, so
+  # they are dropped from numerator and denominator alike. Leaving them in
+  # turns the whole score into NA for everyone who took part in any of them:
+  # eleven such votes in EP10 blanked 732 of 738 MEPs.
+  known <- !is.na(adopted)
+  adopted[!known] <- FALSE
   agree    <- sweep(mat == 1L, 2, adopted, "&") | sweep(mat == 2L, 2, !adopted, "&")
   disagree <- sweep(mat == 1L, 2, !adopted, "&") | sweep(mat == 2L, 2, adopted, "&")
-  tot_w <- rowSums(present)
+  agree[, !known]    <- FALSE
+  disagree[, !known] <- FALSE
+  tot_w <- rowSums(present[, known, drop = FALSE])
   info$Winning_Score <- round(ifelse(tot_w > 0,
                                      (rowSums(agree) - rowSums(disagree)) / tot_w, NA_real_), 4)
 

@@ -136,7 +136,11 @@ ep_mep_detail <- function(id) {
   chr <- function(x) if (is.null(x)) NA_character_ else as.character(x)[1]
 
   country <- sub(".*/", "", chr(r$citizenship))
-  gender  <- sub(".*/", "", chr(r$hasGender))
+  # The API says MALE / FEMALE, and NKN where it is not recorded. The published
+  # EP6-EP9 files use M / F, and the app's gender filter offers exactly those
+  # two, so anything else silently filters the MEP away. Translate here, at the
+  # one point every downstream script goes through.
+  gender  <- unname(c(MALE = "M", FEMALE = "F")[sub(".*/", "", chr(r$hasGender))])
 
   # hasMembership holds political group, national party and term memberships,
   # each with its own validity window.

@@ -276,7 +276,7 @@ shinyServer(function(input, output, session) {
         "Group of the Alliance of Liberals and Democrats for Europe" = 4,
         "Group of the European People's Party (Christian Democrats)" = 5,
         "European Conservatives and Reformists Group" = 6,
-        "Europe of Freedom and Democracy Group" = 7,
+        "Europe of freedom and democracy Group" = 7,   # spelling as it appears in the data
         "Non-attached Members" = 8
       ),
       "P8" = c(
@@ -345,7 +345,7 @@ shinyServer(function(input, output, session) {
       "P7" = c(
         "Group of the Alliance of Liberals and Democrats for Europe" = "gold",
         "Group of the European People's Party (Christian Democrats)" = "blue",
-        "Europe of Freedom and Democracy Group" = "lightblue",
+        "Europe of freedom and democracy Group" = "lightblue",
         "Non-attached Members" = "grey", 
         "Group of the Greens/European Free Alliance" = "green",
         "European Conservatives and Reformists Group" = "darkblue",
@@ -416,7 +416,7 @@ shinyServer(function(input, output, session) {
         "Group of the Alliance of Liberals and Democrats for Europe" = "Liberals & Democrats",
         "Group of the European People's Party (Christian Democrats)" = "EPP",
         "European Conservatives and Reformists Group" = "ECR",
-        "Europe of Freedom and Democracy Group" = "Europe of Freedom & Democracy",
+        "Europe of freedom and democracy Group" = "Europe of Freedom & Democracy",
         "Non-attached Members" = "Non-attached"
       ),
       "P8" = c(
@@ -1409,8 +1409,10 @@ shinyServer(function(input, output, session) {
                   "Denmark", "Ireland", "Spain", "Belgium", "Austria", "Finland", "Sweden", "Greece",
                   "Cyprus", "Lithuania", "Poland", "Hungary", "Latvia", "Estonia", "Slovakia", "Malta",
                   "Slovenia", "Czech Republic", "Romania", "Bulgaria", "Croatia"),
+      # These are Eurostat NUTS codes, which is what SHP_0 keys on, not ISO-3166.
+      # Greece is "EL" there; "GR" matches nothing and drops it from the map.
       geo = c("DE", "PT", "LU", "UK", "FR", "IT", "NL", "DK", "IE", "ES", "BE", "AT", "FI", "SE",
-              "GR", "CY", "LT", "PL", "HU", "LV", "EE", "SK", "MT", "SI", "CZ", "RO", "BG", "HR")
+              "EL", "CY", "LT", "PL", "HU", "LV", "EE", "SK", "MT", "SI", "CZ", "RO", "BG", "HR")
     )
     
     # Zuordnung der EU28-Länder, inklusive UK
@@ -3166,7 +3168,13 @@ shinyServer(function(input, output, session) {
       mutate(seats = 1,
              seats_total = nrow(fullData),
              left_right = left_right_order[EPG]) %>%
-      mutate(left_right = factor(left_right, levels = 1:8))
+      # Levels come from the order map rather than a fixed 1:8. EP8, EP9 and
+      # EP10 seat nine groups; the ninth used to fall out of the factor and
+      # only landed in the right place because arrange() sorts NA last and it
+      # happened to belong last. A ninth group anywhere else would have been
+      # seated at the far right without a word.
+      mutate(left_right = factor(left_right,
+                                 levels = seq_len(max(left_right_order, na.rm = TRUE))))
     
     # Rename columns
     colnames(data) <- c("party_name_short", "member_name", "photo", "Age", "Gender", "Activity_Index", "seats", "seats_total", "left_right")
@@ -3430,6 +3438,7 @@ shinyServer(function(input, output, session) {
     "Netherlands" = "nl",
     "Ireland" = "ie",
     "United Kingdom" = "gb",
+    "Denmark" = "dk",
     "Greece" = "gr",
     "Spain" = "es",
     "Belgium" = "be",

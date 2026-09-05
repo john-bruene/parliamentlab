@@ -120,8 +120,18 @@ who took their seats after June 2022. Group names are harmonised to the long
 form the API returns, using a mapping read off the 696 MEPs present in both.
 For those 62 the API is the only source, so their country codes are translated
 from ISO-3166 alpha-3 to the full English names the rest of the app keys on,
-and their seniority is derived from their earlier term memberships rather than
-left at zero: 8 of them had served before.
+their gender from MALE/FEMALE to the M/F the filter offers, and their seniority
+is derived from their earlier term memberships rather than left at zero: 8 of
+them had served before.
+
+Activity counts are the one field where the published half wins outright. The
+Parltrack dump restricted to this term credits 391 of the 811 published MEPs
+with no activity at all, and even unwindowed its totals correlate only 0.70
+with the published columns, so the two were counted under different rules.
+Taking the dump throughout would have shown half the chamber as inactive, so
+the published counts stand where they exist and the dump covers only the 62
+replacements. That does mean a continuing member's 2022-2024 activity is not
+added to their total.
 
 One caveat carries into the merged file. The published half distinguishes
 three kinds of absence (codes 4, 5 and 6), the API only reports "not in any
