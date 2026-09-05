@@ -105,6 +105,15 @@ The `data/` folder holds both the raw source tables (`*_umap_scores_red_NEW.csv`
 
 VoteWatch Europe shut down in 2022, so the raw files are kept in the repository rather than linked, to keep the analysis reproducible.
 
+The app caches each legislature it has loaded for the life of the process, so a
+visitor who walks through all six leaves every one of them resident. `load_parl()`
+narrows the vote columns from double to integer on the way in, which takes that
+from 333 MB to 213 MB: the codes only run 0 to 6, and EP6-EP9 store them at eight
+bytes a cell. The files on disk are untouched, the conversion costs about a fifth
+of a second across all six, and it is lossless — the app hands these columns to
+`as.factor()` before Gower or MCA sees them, so no coordinate can tell the two
+types apart. `tests/testthat/test-vote-storage.R` checks both halves of that.
+
 The 9th Parliament appears twice in the selector, on purpose:
 
 - **2019-2022, as published** is `data/P9_umap.rds`, untouched. It is what the

@@ -102,14 +102,37 @@ shiny::addResourcePath("mepphotos", .photo_dir)
   stop("download failed (", if (nzchar(res$msg)) res$msg else paste("status", res$status), ")")
 }
 
+# Vote codes run 0-6, so they fit in an integer, but the EP6-EP9 files store
+# them as doubles: eight bytes a cell where four will do. That is 124 MB of
+# waste across the four, and the cache above keeps every legislature a visitor
+# has looked at, so a session that walks through all six holds 333 MB where
+# 209 MB would do. The files on disk are left exactly as published; the
+# narrowing happens here, once per legislature per process, and costs about a
+# tenth of a second.
+#
+# Only whole-valued columns are touched, so a file that ever carries something
+# other than a vote code is left alone rather than silently truncated.
+# Everything downstream is unaffected: the app hands these columns to
+# as.factor() before Gower and MCA see them, and the W-NOMINATE coordinates
+# are precomputed rather than derived here. See test-vote-storage.R.
+.compact_votes <- function(d) {
+  xc  <- grep("^X[0-9]+$", names(d))
+  dbl <- xc[vapply(d[xc], is.double, logical(1))]
+  if (!length(dbl)) return(d)
+  whole <- vapply(d[dbl], function(v) !anyNA(v) && all(v == trunc(v)), logical(1))
+  if (any(whole)) d[dbl[whole]] <- lapply(d[dbl[whole]], as.integer)
+  d
+}
+
 load_parl <- function(p) {
   if (is.null(.data_cache[[p]])) {
     qs_path <- paste0("data/", p, "_umap.qs")
-    if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
-      .data_cache[[p]] <- timed(paste("qs::qread", p), qs::qread(qs_path))
+    raw <- if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
+      timed(paste("qs::qread", p), qs::qread(qs_path))
     } else {
-      .data_cache[[p]] <- timed(paste("readRDS", p), readRDS(paste0("data/", p, "_umap.rds")))
+      timed(paste("readRDS", p), readRDS(paste0("data/", p, "_umap.rds")))
     }
+    .data_cache[[p]] <- timed(paste("compact", p), .compact_votes(raw))
   }
   .data_cache[[p]]
 }
