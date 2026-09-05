@@ -153,7 +153,9 @@ shinyServer(function(input, output, session) {
     P8 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 8,
               umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.820),
     P9 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 7,
-              umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.811)
+              umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.811),
+    P10 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 10,
+               umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.778)
   )
 
   clusterPlotObject <- reactiveVal(NULL)
@@ -296,6 +298,20 @@ shinyServer(function(input, output, session) {
         "IDG" = 7,
         "NI" = 8,
         "Non-attached Members" = 9
+      ),
+      # EP10 uses the Parliament's own long group names (the API returns those,
+      # matching P6-P8; P9 above is the odd one out with short codes). The
+      # order follows the mean W-NOMINATE position measured for this term.
+      "P10" = c(
+        "The Left group in the European Parliament - GUE/NGL" = 1,
+        "Group of the Greens/European Free Alliance" = 2,
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = 3,
+        "Renew Europe Group" = 4,
+        "Group of the European People's Party (Christian Democrats)" = 5,
+        "European Conservatives and Reformists Group" = 6,
+        "Patriots for Europe Group" = 7,
+        "Europe of Sovereign Nations Group" = 8,
+        "Non-attached Members" = 9
       )
     )
     
@@ -342,6 +358,17 @@ shinyServer(function(input, output, session) {
         "The Left" = "darkred",
         "IDG" = "purple",
         "Non-attached Members" = "lightblue"
+      ),
+      "P10" = c(
+        "Group of the European People's Party (Christian Democrats)" = "blue",
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = "red",
+        "Renew Europe Group" = "gold",
+        "Group of the Greens/European Free Alliance" = "green",
+        "European Conservatives and Reformists Group" = "darkblue",
+        "The Left group in the European Parliament - GUE/NGL" = "darkred",
+        "Patriots for Europe Group" = "purple",
+        "Europe of Sovereign Nations Group" = "brown",
+        "Non-attached Members" = "grey"
       )
     )
     
@@ -387,6 +414,17 @@ shinyServer(function(input, output, session) {
         "ECR" = "ECR",
         "IDG" = "ID",
         "NI" = "Non-attached",
+        "Non-attached Members" = "Non-attached"
+      ),
+      "P10" = c(
+        "The Left group in the European Parliament - GUE/NGL" = "The Left",
+        "Group of the Greens/European Free Alliance" = "Greens/EFA",
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = "Socialists & Democrats",
+        "Renew Europe Group" = "Renew Europe",
+        "Group of the European People's Party (Christian Democrats)" = "EPP",
+        "European Conservatives and Reformists Group" = "ECR",
+        "Patriots for Europe Group" = "Patriots for Europe",
+        "Europe of Sovereign Nations Group" = "Sovereign Nations",
         "Non-attached Members" = "Non-attached"
       )
     )
@@ -1536,7 +1574,7 @@ shinyServer(function(input, output, session) {
       
       # Prepare data
       data <- data_react()
-      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9)
+      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P10" = 10)
       
       # Filter data based on selected Parliament and relevant votes
       relevant_votes <- load_voted() %>%
@@ -1667,7 +1705,7 @@ shinyServer(function(input, output, session) {
     # Schritt 1: Extract Vote_ID from variable_contributions$Variable
     variable_contributions <- datasets$variable_contributions
     
-    legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9)
+    legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P10" = 10)
     
     # Filter data based on selected Parliament and relevant votes
     EP6_9 <- load_voted() %>%
@@ -1737,7 +1775,7 @@ shinyServer(function(input, output, session) {
       
       # Prepare data
       data <- data_react()
-      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9)
+      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P10" = 10)
       
       # Filter data based on selected Parliament and relevant votes
       relevant_votes <- load_voted() %>%
@@ -4282,7 +4320,28 @@ shinyServer(function(input, output, session) {
     req(data)
     
     data <- data[data$Cluster != 0, ]
-    
+
+    # The radar chart compares clusters on the per-topic voting scores. Those
+    # depend on a policy area per vote, which is not available for every
+    # legislature (EP10 has none yet: Parltrack's dossier dump stops in April
+    # 2024). Without them every axis would be NaN and the chart would render
+    # empty, so say so instead.
+    topic_cols <- c("Economy_Score", "Social_Score", "Foreign_Policy_Score",
+                    "Industry_Score", "Education_Score", "Budget_Score")
+    have <- intersect(topic_cols, names(data))
+    if (!length(have) || all(vapply(data[have], function(x) all(is.na(x)), logical(1)))) {
+      return(
+        plotly::plot_ly() %>%
+          plotly::add_annotations(
+            text = paste("Topic scores are not available for this legislature,",
+                         "so the clusters cannot be compared by policy area."),
+            x = 0.5, y = 0.5, xref = "paper", yref = "paper",
+            showarrow = FALSE, font = list(size = 14, color = "grey40")
+          ) %>%
+          plotly::layout(xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
+      )
+    }
+
     # Prepare data for radar chart
     radar_data <- data %>%
       group_by(Cluster) %>%

@@ -105,7 +105,8 @@ shinyUI(fluidPage(
                   "6th Parliament (2004–2009)" = "P6",
                   "7th Parliament (2009–2014)" = "P7",
                   "8th Parliament (2014–2019)" = "P8",
-                  "9th Parliament (2019–2024)" = "P9"
+                  "9th Parliament (2019–2022)" = "P9",
+                  "10th Parliament (2024–2026)" = "P10"
                 ),
                 selected = "P9",
                 width = "220px"),
@@ -292,7 +293,7 @@ shinyUI(fluidPage(
                                         
                                         
                                         p("Remember this is the 538s result:",style="color:black;text-align:center"),
-                                        a(href="https://projects.fivethirtyeight.com/types-democrats-republicans-house-2024/", tags$img(src="538_Example.png",width = "90%", height = "auto",style="border:1px solid black"),
+                                        a(href="https://web.archive.org/web/20240509010255/https://projects.fivethirtyeight.com/types-democrats-republicans-house-2024/", tags$img(src="538_Example.png",width = "90%", height = "auto",style="border:1px solid black"),
                                               target="_blank"),
                                         br(),
                                         br(),
