@@ -21,7 +21,7 @@ out_dir <- file.path("www", "mep_photos")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ── Collect every distinct photo URL across all legislatures ────────────────
-periods <- c("P6", "P7", "P8", "P9")
+periods <- c("P6", "P7", "P8", "P9", "P9full", "P10")
 urls <- unlist(lapply(periods, function(p) {
   f <- sprintf("data/%s_umap.rds", p)
   if (!file.exists(f)) return(character(0))

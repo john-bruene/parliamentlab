@@ -102,14 +102,37 @@ shiny::addResourcePath("mepphotos", .photo_dir)
   stop("download failed (", if (nzchar(res$msg)) res$msg else paste("status", res$status), ")")
 }
 
+# Vote codes run 0-6, so they fit in an integer, but the EP6-EP9 files store
+# them as doubles: eight bytes a cell where four will do. That is 124 MB of
+# waste across the four, and the cache above keeps every legislature a visitor
+# has looked at, so a session that walks through all six holds 333 MB where
+# 209 MB would do. The files on disk are left exactly as published; the
+# narrowing happens here, once per legislature per process, and costs about a
+# tenth of a second.
+#
+# Only whole-valued columns are touched, so a file that ever carries something
+# other than a vote code is left alone rather than silently truncated.
+# Everything downstream is unaffected: the app hands these columns to
+# as.factor() before Gower and MCA see them, and the W-NOMINATE coordinates
+# are precomputed rather than derived here. See test-vote-storage.R.
+.compact_votes <- function(d) {
+  xc  <- grep("^X[0-9]+$", names(d))
+  dbl <- xc[vapply(d[xc], is.double, logical(1))]
+  if (!length(dbl)) return(d)
+  whole <- vapply(d[dbl], function(v) !anyNA(v) && all(v == trunc(v)), logical(1))
+  if (any(whole)) d[dbl[whole]] <- lapply(d[dbl[whole]], as.integer)
+  d
+}
+
 load_parl <- function(p) {
   if (is.null(.data_cache[[p]])) {
     qs_path <- paste0("data/", p, "_umap.qs")
-    if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
-      .data_cache[[p]] <- timed(paste("qs::qread", p), qs::qread(qs_path))
+    raw <- if (requireNamespace("qs", quietly = TRUE) && file.exists(qs_path)) {
+      timed(paste("qs::qread", p), qs::qread(qs_path))
     } else {
-      .data_cache[[p]] <- timed(paste("readRDS", p), readRDS(paste0("data/", p, "_umap.rds")))
+      timed(paste("readRDS", p), readRDS(paste0("data/", p, "_umap.rds")))
     }
+    .data_cache[[p]] <- timed(paste("compact", p), .compact_votes(raw))
   }
   .data_cache[[p]]
 }
@@ -153,7 +176,11 @@ shinyServer(function(input, output, session) {
     P8 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 8,
               umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.820),
     P9 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 7,
-              umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.811)
+              umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.811),
+    P9full = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 12,
+                  umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.842),
+    P10 = list(mapping = "UMAP", method = "HDBSCAN", minPts = 20, n_clusters = 10,
+               umap_x = "UMAP1", umap_y = "UMAP2", silhouette = 0.778)
   )
 
   clusterPlotObject <- reactiveVal(NULL)
@@ -272,7 +299,7 @@ shinyServer(function(input, output, session) {
         "Group of the Alliance of Liberals and Democrats for Europe" = 4,
         "Group of the European People's Party (Christian Democrats)" = 5,
         "European Conservatives and Reformists Group" = 6,
-        "Europe of Freedom and Democracy Group" = 7,
+        "Europe of freedom and democracy Group" = 7,   # spelling as it appears in the data
         "Non-attached Members" = 8
       ),
       "P8" = c(
@@ -296,6 +323,33 @@ shinyServer(function(input, output, session) {
         "IDG" = 7,
         "NI" = 8,
         "Non-attached Members" = 9
+      ),
+      # EP9 over its full term. Same left-right sequence as the published P9
+      # block above, but with the long group names the API returns, so the
+      # 2022-2024 half lines up with the 2019-2022 half.
+      "P9full" = c(
+        "The Left group in the European Parliament - GUE/NGL" = 1,
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = 2,
+        "Group of the Greens/European Free Alliance" = 3,
+        "Renew Europe Group" = 4,
+        "Group of the European People's Party (Christian Democrats)" = 5,
+        "European Conservatives and Reformists Group" = 6,
+        "Identity and Democracy Group" = 7,
+        "Non-attached Members" = 8
+      ),
+      # EP10 uses the Parliament's own long group names (the API returns those,
+      # matching P6-P8; P9 above is the odd one out with short codes). The
+      # order follows the mean W-NOMINATE position measured for this term.
+      "P10" = c(
+        "The Left group in the European Parliament - GUE/NGL" = 1,
+        "Group of the Greens/European Free Alliance" = 2,
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = 3,
+        "Renew Europe Group" = 4,
+        "Group of the European People's Party (Christian Democrats)" = 5,
+        "European Conservatives and Reformists Group" = 6,
+        "Patriots for Europe Group" = 7,
+        "Europe of Sovereign Nations Group" = 8,
+        "Non-attached Members" = 9
       )
     )
     
@@ -314,7 +368,7 @@ shinyServer(function(input, output, session) {
       "P7" = c(
         "Group of the Alliance of Liberals and Democrats for Europe" = "gold",
         "Group of the European People's Party (Christian Democrats)" = "blue",
-        "Europe of Freedom and Democracy Group" = "lightblue",
+        "Europe of freedom and democracy Group" = "lightblue",
         "Non-attached Members" = "grey", 
         "Group of the Greens/European Free Alliance" = "green",
         "European Conservatives and Reformists Group" = "darkblue",
@@ -342,6 +396,27 @@ shinyServer(function(input, output, session) {
         "The Left" = "darkred",
         "IDG" = "purple",
         "Non-attached Members" = "lightblue"
+      ),
+      "P9full" = c(
+        "Group of the European People's Party (Christian Democrats)" = "blue",
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = "red",
+        "Renew Europe Group" = "gold",
+        "Group of the Greens/European Free Alliance" = "green",
+        "European Conservatives and Reformists Group" = "darkblue",
+        "The Left group in the European Parliament - GUE/NGL" = "darkred",
+        "Identity and Democracy Group" = "purple",
+        "Non-attached Members" = "grey"
+      ),
+      "P10" = c(
+        "Group of the European People's Party (Christian Democrats)" = "blue",
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = "red",
+        "Renew Europe Group" = "gold",
+        "Group of the Greens/European Free Alliance" = "green",
+        "European Conservatives and Reformists Group" = "darkblue",
+        "The Left group in the European Parliament - GUE/NGL" = "darkred",
+        "Patriots for Europe Group" = "purple",
+        "Europe of Sovereign Nations Group" = "brown",
+        "Non-attached Members" = "grey"
       )
     )
     
@@ -364,7 +439,7 @@ shinyServer(function(input, output, session) {
         "Group of the Alliance of Liberals and Democrats for Europe" = "Liberals & Democrats",
         "Group of the European People's Party (Christian Democrats)" = "EPP",
         "European Conservatives and Reformists Group" = "ECR",
-        "Europe of Freedom and Democracy Group" = "Europe of Freedom & Democracy",
+        "Europe of freedom and democracy Group" = "Europe of Freedom & Democracy",
         "Non-attached Members" = "Non-attached"
       ),
       "P8" = c(
@@ -387,6 +462,27 @@ shinyServer(function(input, output, session) {
         "ECR" = "ECR",
         "IDG" = "ID",
         "NI" = "Non-attached",
+        "Non-attached Members" = "Non-attached"
+      ),
+      "P9full" = c(
+        "The Left group in the European Parliament - GUE/NGL" = "The Left",
+        "Group of the Greens/European Free Alliance" = "Greens/EFA",
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = "Socialists & Democrats",
+        "Renew Europe Group" = "Renew Europe",
+        "Group of the European People's Party (Christian Democrats)" = "EPP",
+        "European Conservatives and Reformists Group" = "ECR",
+        "Identity and Democracy Group" = "ID",
+        "Non-attached Members" = "Non-attached"
+      ),
+      "P10" = c(
+        "The Left group in the European Parliament - GUE/NGL" = "The Left",
+        "Group of the Greens/European Free Alliance" = "Greens/EFA",
+        "Group of the Progressive Alliance of Socialists and Democrats in the European Parliament" = "Socialists & Democrats",
+        "Renew Europe Group" = "Renew Europe",
+        "Group of the European People's Party (Christian Democrats)" = "EPP",
+        "European Conservatives and Reformists Group" = "ECR",
+        "Patriots for Europe Group" = "Patriots for Europe",
+        "Europe of Sovereign Nations Group" = "Sovereign Nations",
         "Non-attached Members" = "Non-attached"
       )
     )
@@ -1336,8 +1432,10 @@ shinyServer(function(input, output, session) {
                   "Denmark", "Ireland", "Spain", "Belgium", "Austria", "Finland", "Sweden", "Greece",
                   "Cyprus", "Lithuania", "Poland", "Hungary", "Latvia", "Estonia", "Slovakia", "Malta",
                   "Slovenia", "Czech Republic", "Romania", "Bulgaria", "Croatia"),
+      # These are Eurostat NUTS codes, which is what SHP_0 keys on, not ISO-3166.
+      # Greece is "EL" there; "GR" matches nothing and drops it from the map.
       geo = c("DE", "PT", "LU", "UK", "FR", "IT", "NL", "DK", "IE", "ES", "BE", "AT", "FI", "SE",
-              "GR", "CY", "LT", "PL", "HU", "LV", "EE", "SK", "MT", "SI", "CZ", "RO", "BG", "HR")
+              "EL", "CY", "LT", "PL", "HU", "LV", "EE", "SK", "MT", "SI", "CZ", "RO", "BG", "HR")
     )
     
     # Zuordnung der EU28-Länder, inklusive UK
@@ -1536,7 +1634,7 @@ shinyServer(function(input, output, session) {
       
       # Prepare data
       data <- data_react()
-      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9)
+      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P9full" = 9, "P10" = 10)
       
       # Filter data based on selected Parliament and relevant votes
       relevant_votes <- load_voted() %>%
@@ -1667,7 +1765,7 @@ shinyServer(function(input, output, session) {
     # Schritt 1: Extract Vote_ID from variable_contributions$Variable
     variable_contributions <- datasets$variable_contributions
     
-    legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9)
+    legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P9full" = 9, "P10" = 10)
     
     # Filter data based on selected Parliament and relevant votes
     EP6_9 <- load_voted() %>%
@@ -1737,7 +1835,7 @@ shinyServer(function(input, output, session) {
       
       # Prepare data
       data <- data_react()
-      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9)
+      legislature_map <- c("P6" = 6, "P7" = 7, "P8" = 8, "P9" = 9, "P9full" = 9, "P10" = 10)
       
       # Filter data based on selected Parliament and relevant votes
       relevant_votes <- load_voted() %>%
@@ -3093,7 +3191,13 @@ shinyServer(function(input, output, session) {
       mutate(seats = 1,
              seats_total = nrow(fullData),
              left_right = left_right_order[EPG]) %>%
-      mutate(left_right = factor(left_right, levels = 1:8))
+      # Levels come from the order map rather than a fixed 1:8. EP8, EP9 and
+      # EP10 seat nine groups; the ninth used to fall out of the factor and
+      # only landed in the right place because arrange() sorts NA last and it
+      # happened to belong last. A ninth group anywhere else would have been
+      # seated at the far right without a word.
+      mutate(left_right = factor(left_right,
+                                 levels = seq_len(max(left_right_order, na.rm = TRUE))))
     
     # Rename columns
     colnames(data) <- c("party_name_short", "member_name", "photo", "Age", "Gender", "Activity_Index", "seats", "seats_total", "left_right")
@@ -3357,6 +3461,7 @@ shinyServer(function(input, output, session) {
     "Netherlands" = "nl",
     "Ireland" = "ie",
     "United Kingdom" = "gb",
+    "Denmark" = "dk",
     "Greece" = "gr",
     "Spain" = "es",
     "Belgium" = "be",
@@ -3752,17 +3857,25 @@ shinyServer(function(input, output, session) {
   
   
   # Human-readable label for the global legislature selector display
+  # Keep these in step with the choices in ui.R's selectedP selector.
   .period_labels <- c(
-    P6 = "6th Parliament (2004–2009)",
-    P7 = "7th Parliament (2009–2014)",
-    P8 = "8th Parliament (2014–2019)",
-    P9 = "9th Parliament (2019–2024)"
+    P6     = "6th Parliament (2004–2009)",
+    P7     = "7th Parliament (2009–2014)",
+    P8     = "8th Parliament (2014–2019)",
+    P9     = "9th Parliament (2019–2022, as published)",
+    P9full = "9th Parliament (2019–2024, full term)",
+    P10    = "10th Parliament (2024–2026)"
   )
+  .period_label <- function(p) {
+    # single-bracket lookup: an unknown key yields NA rather than an error
+    lbl <- unname(.period_labels[p %||% "P9"])
+    if (length(lbl) != 1L || is.na(lbl)) "European Parliament" else lbl
+  }
   output$selected_period_label <- renderText({
-    .period_labels[input$selectedP %||% "P9"]
+    .period_label(input$selectedP)
   })
   output$selected_period_label2 <- renderText({
-    .period_labels[input$selectedP %||% "P9"]
+    .period_label(input$selectedP)
   })
 
   output$dynamicTitle <- renderUI({
@@ -3781,10 +3894,13 @@ shinyServer(function(input, output, session) {
     # Convert parliament_period from "P6", "P7", etc., to "6th", "7th", etc.
     parliament_period <- switch(
       input$selectedP,
-      "P6" = "6th European Parliament",
-      "P7" = "7th European Parliament",
-      "P8" = "8th European Parliament",
-      "P9" = "9th European Parliament"
+      "P6"     = "6th European Parliament",
+      "P7"     = "7th European Parliament",
+      "P8"     = "8th European Parliament",
+      "P9"     = "9th European Parliament",
+      "P9full" = "9th European Parliament, full term",
+      "P10"    = "10th European Parliament",
+      "European Parliament"   # fallback, so the headline never ends mid-sentence
     )
     
     h2(
@@ -4282,7 +4398,28 @@ shinyServer(function(input, output, session) {
     req(data)
     
     data <- data[data$Cluster != 0, ]
-    
+
+    # The radar chart compares clusters on the per-topic voting scores. Those
+    # depend on a policy area per vote, which is not available for every
+    # legislature (EP10 has none yet: Parltrack's dossier dump stops in April
+    # 2024). Without them every axis would be NaN and the chart would render
+    # empty, so say so instead.
+    topic_cols <- c("Economy_Score", "Social_Score", "Foreign_Policy_Score",
+                    "Industry_Score", "Education_Score", "Budget_Score")
+    have <- intersect(topic_cols, names(data))
+    if (!length(have) || all(vapply(data[have], function(x) all(is.na(x)), logical(1)))) {
+      return(
+        plotly::plot_ly() %>%
+          plotly::add_annotations(
+            text = paste("Topic scores are not available for this legislature,",
+                         "so the clusters cannot be compared by policy area."),
+            x = 0.5, y = 0.5, xref = "paper", yref = "paper",
+            showarrow = FALSE, font = list(size = 14, color = "grey40")
+          ) %>%
+          plotly::layout(xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
+      )
+    }
+
     # Prepare data for radar chart
     radar_data <- data %>%
       group_by(Cluster) %>%

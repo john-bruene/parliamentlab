@@ -30,3 +30,6 @@ data/*.csv
 # Docker build artefacts
 Dockerfile.dockerignore
 .dockerignore
+data/api_cache
+data/scraped
+tests
