@@ -35,3 +35,5 @@ data/api_cache
 data/scraped
 tests
 renv.lock
+data/P9full_umap.rds
+data/P9full_best_clusters.rds

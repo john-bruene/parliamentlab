@@ -78,13 +78,9 @@ test_that("P9full has the topic scores the radar chart needs", {
   for (t in topics) expect_false(all(is.na(full[[t]])), label = t)
 })
 
-test_that("the app is wired up for P9full", {
-  ui  <- paste(readLines(proj_path("ui.R"), warn = FALSE), collapse = "\n")
-  srv <- paste(readLines(proj_path("server.R"), warn = FALSE), collapse = "\n")
-  expect_true(grepl('"P9full"', ui, fixed = TRUE))
-  # Party colours, seating order, axis labels, and the clustering defaults all
-  # key on the legislature code; missing one shows up as grey dots or a
-  # headline that stops mid-sentence.
-  expect_gte(lengths(regmatches(srv, gregexpr('"P9full"', srv, fixed = TRUE)))[1], 4)
-  expect_true(grepl("P9full = list(", srv, fixed = TRUE))
+test_that("P9full is not offered in the selector", {
+  # The full-term file is kept for reference, but the app shows EP9 as in the
+  # article and EP10 as the new term, not an EP9 topped up to 2024.
+  ui <- paste(readLines(proj_path("ui.R"), warn = FALSE), collapse = "\n")
+  expect_false(grepl('"P9full"', ui, fixed = TRUE))
 })

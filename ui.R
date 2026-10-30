@@ -105,8 +105,7 @@ shinyUI(fluidPage(
                   "6th Parliament (2004–2009)" = "P6",
                   "7th Parliament (2009–2014)" = "P7",
                   "8th Parliament (2014–2019)" = "P8",
-                  "9th Parliament (2019–2022, as published)" = "P9",
-                  "9th Parliament (2019–2024, full term)" = "P9full",
+                  "9th Parliament (2019–2022)" = "P9",
                   "10th Parliament (2024–2026)" = "P10"
                 ),
                 selected = "P9",
