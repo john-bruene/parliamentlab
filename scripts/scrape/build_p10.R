@@ -17,6 +17,7 @@
 suppressPackageStartupMessages({
   library(cluster); library(umap); library(FactoMineR); library(wnominate)
 })
+source(file.path("R", "mca_specific.R"))  # MCA with "not in office"/"absent" set aside
 
 out_file <- file.path("data", "P10_umap.rds")
 TERM_START <- as.Date("2024-07-16")
@@ -69,14 +70,19 @@ if (!all(full_cols %in% names(d))) {
                              minvotes = 20, lop = 0.025, verbose = FALSE)
   d$coord1D <- wa$legislators$coord1D; d$coord2D <- wa$legislators$coord2D
   fa <- as.data.frame(lapply(as.data.frame(Ma), factor))
-  mca <- FactoMineR::MCA(fa, ncp = 2, graph = FALSE)
-  d$MCA1 <- mca$ind$coord[, 1]; d$MCA2 <- mca$ind$coord[, 2]
   ga <- cluster::daisy(fa, metric = "gower")
   cfa <- umap::umap.defaults; cfa$input <- "dist"; cfa$n_components <- 2
   set.seed(123)
   ua <- umap::umap(as.matrix(ga), config = cfa)
   d$UMAP1 <- ua$layout[, 1]; d$UMAP2 <- ua$layout[, 2]
 }
+
+# The candidate file may predate the switch to specific MCA, so MCA1/MCA2 are
+# always recomputed here (about a minute) rather than taken from it.
+d[c("MCA1", "MCA2")] <- local({
+  mca <- mca_votes(as.data.frame(lapply(d[xc_all], factor)), ncp = 2)
+  list(mca$ind$coord[, 1], mca$ind$coord[, 2])
+})
 
 # ── Term dates and experience, from the cached membership records ───────────
 source(file.path("scripts", "scrape", "ep_api.R"))
@@ -147,7 +153,7 @@ d$coord1D_red <- w$legislators$coord1D
 d$coord2D_red <- w$legislators$coord2D
 
 fr <- as.data.frame(lapply(as.data.frame(Mr), factor))
-mc <- FactoMineR::MCA(fr, ncp = 2, graph = FALSE)
+mc <- mca_votes(fr, ncp = 2)
 d$MCA1_red <- mc$ind$coord[, 1]; d$MCA2_red <- mc$ind$coord[, 2]
 
 g <- cluster::daisy(fr, metric = "gower")

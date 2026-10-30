@@ -29,6 +29,7 @@ options(shiny.sanitize.errors = TRUE)
 # Provides: parliament_data_local(), geom_parliament_seats_local(),
 #           theme_ggparliament_local()
 source("R/parliament_local.R")
+source("R/mca_specific.R")
 
 # ── Optional lightweight profiling ──────────────────────────────────────────
 # Set option(parliamentlab.profile = TRUE) before sourcing (e.g. in profile.R)
@@ -1662,8 +1663,8 @@ shinyServer(function(input, output, session) {
       # Dynamic MCA dimensions (cap at 10 for safety)
       n_components <- min(input$mca_ncp, 10)
       
-      # Run MCA
-      mca_results <- MCA(mca_data %>% select(all_of(relevant_columns)), ncp = n_components, graph = FALSE)
+      # Run MCA with "not in office" and "absent" kept out of the axes: see R/mca_specific.R
+      mca_results <- mca_votes(mca_data %>% select(all_of(relevant_columns)), ncp = n_components)
       
       
       
@@ -2056,8 +2057,13 @@ shinyServer(function(input, output, session) {
         mca_data <- mca_data %>%
           rename(MC1 = all_of(coord1), MC2 = all_of(coord2))
         
-        # Filter out observations where MC1 or MC2 exceeds 1.5
-        mca_data <- mca_data %>% filter(abs(MC1) <= 1.2, abs(MC2) <= 1.5)
+        # Filter out observations where MC1 or MC2 exceeds 1.5. Kept for the
+        # published coordinates (P6-P9), which use plain MCA. EP10 sets "not
+        # in office" and "absent" aside (R/mca_specific.R), so nothing there is
+        # an artefact, and the filter would hide 28 MEPs on its right edge.
+        if (input$selectedP != "P10") {
+          mca_data <- mca_data %>% filter(abs(MC1) <= 1.2, abs(MC2) <= 1.5)
+        }
         
         
         # Render MCA plot
